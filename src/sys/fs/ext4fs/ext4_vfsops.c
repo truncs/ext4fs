@@ -1,1025 +1,1201 @@
-<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN"
-"http://www.w3.org/TR/REC-html40/loose.dtd">
-<Html>
-<Head>
-<Title>P4Web.FreeBSD.org - //depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c</Title>
-<script type="text/javascript"><!--
-var finm
-var args
-var mShw = 0
-var m
-function hideMenu() {
-	if (m)
-		m.style.display='none'
-}
-function formFieldClear( field, text )
+/*-
+ *  modified for EXT2FS support in Lites 1.1
+ *
+ *  Aug 1995, Godmar Back (gback@cs.utah.edu)
+ *  University of Utah, Department of Computer Science
+ */
+/*-
+ * Copyright (c) 1989, 1991, 1993, 1994
+ *	The Regents of the University of California.  All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 4. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ *	@(#)ffs_vfsops.c	8.8 (Berkeley) 4/18/94
+ * $FreeBSD: src/sys/fs/ext4fs/ext4_vfsops.c,v 1.1 2010/09/16 20:44:00 lz Exp $
+ */
+
+#include <sys/param.h>
+#include <sys/systm.h>
+#include <sys/namei.h>
+#include <sys/priv.h>
+#include <sys/proc.h>
+#include <sys/kernel.h>
+#include <sys/vnode.h>
+#include <sys/mount.h>
+#include <sys/bio.h>
+#include <sys/buf.h>
+#include <sys/conf.h>
+#include <sys/fcntl.h>
+#include <sys/malloc.h>
+#include <sys/stat.h>
+#include <sys/mutex.h>
+#include <sys/types.h>
+
+#include <machine/atomic.h>
+
+#include <geom/geom.h>
+#include <geom/geom_vfs.h>
+
+#include <fs/ext4fs/ext4_mount.h>
+#include <fs/ext4fs/inode.h>
+
+#include <fs/ext4fs/fs.h>
+#include <fs/ext4fs/ext4_extern.h>
+#include <fs/ext4fs/ext4fs.h>
+#include <fs/ext4fs/ext4_dinode.h>
+
+static int	ext2_flushfiles(struct mount *mp, int flags, struct thread *td);
+static int	ext2_mountfs(struct vnode *, struct mount *);
+static int	ext2_reload(struct mount *mp, struct thread *td);
+static int	ext2_sbupdate(struct ext2mount *, int);
+static int	ext2_cgupdate(struct ext2mount *, int);
+static vfs_unmount_t		ext2_unmount;
+static vfs_root_t		ext2_root;
+static vfs_statfs_t		ext2_statfs;
+static vfs_sync_t		ext2_sync;
+static vfs_vget_t		ext2_vget;
+static vfs_fhtovp_t		ext2_fhtovp;
+static vfs_mount_t		ext2_mount;
+
+MALLOC_DEFINE(M_EXT2NODE, "ext2_node", "EXT2 vnode private part");
+static MALLOC_DEFINE(M_EXT2MNT, "ext2_mount", "EXT2 mount structure");
+
+static struct vfsops ext2fs_vfsops = {
+	.vfs_fhtovp =		ext2_fhtovp,
+	.vfs_mount =		ext2_mount,
+	.vfs_root =		ext2_root,	/* root inode via vget */
+	.vfs_statfs =		ext2_statfs,
+	.vfs_sync =		ext2_sync,
+	.vfs_unmount =		ext2_unmount,
+	.vfs_vget =		ext2_vget,
+};
+
+VFS_SET(ext2fs_vfsops, ext4fs, 0);
+
+static int	ext2_check_sb_compat(struct ext2fs *es, struct cdev *dev,
+		    int ronly);
+static int	compute_sb_data(struct vnode * devvp,
+		    struct ext2fs * es, struct m_ext2fs * fs);
+static int      ext4_init_fg(struct m_ext2fs *);
+static int      find_most_set_bit(int64_t n);
+
+static const char *ext2_opts[] = { "from", "export", "acls", "noexec",
+    "noatime", "union", "suiddir", "multilabel", "nosymfollow",
+    "noclusterr", "noclusterw", "force", NULL };
+
+/*
+ * VFS Operations.
+ *
+ * mount system call
+ */
+static int
+ext2_mount(struct mount *mp)
 {
-	if (field.value == text) {
-		field.value = '';
-		field.style.color = '#000000';
-    }
-}
-function formFieldRestore( field, text )
-{
-	if (field.value == '') {
-		field.value = text;
-		field.style.color = '#A0A0A0';
-    }
-}
-function hideDiv(divname) {
-	d = document.getElementById(divname)
-	if (d)
-		d.style.display='none'
-}
-function showDiv(divname, divloc) {
-	d = document.getElementById(divname)
-	if (!d)
-		return
-	i = document.getElementById(divloc)
-	if (!i)
-		return
-	var t = i.offsetTop
-	var p = i.offsetParent
-	var l = i.offsetLeft
-	var w = i.offsetWidth
-	while (p.tagName != 'BODY') {
-		t = t + p.offsetTop
-		l = l + p.offsetLeft
-		p = p.offsetParent
-	}
-	d.style.top = t + i.offsetHeight + 10
-	d.style.left = l+(w/2)
-	d.style.display=''
-}
-function validateFilelogForm() {
-	var n = document.forms.filelogForm.revs;
-	for(var i=0; i < n.length; i++) {
-        	if (n[i].checked) {
-				if (document.forms.filelogForm.rev2.value == n[i].value) {
-					alert('You attempted to compare a file with itself. Before choosing the "Diff vs. Selected Revision" option, you must select one of the other revisions by clicking its radio button.')
-					return false;
-				}
-				return true;
+	struct vfsoptlist *opts;
+	struct vnode *devvp;
+	struct thread *td;
+	struct ext2mount *ump = 0;
+	struct m_ext2fs *fs;
+	struct nameidata nd, *ndp = &nd;
+	accmode_t accmode;
+	char *path, *fspec;
+	int error, flags, len;
+
+	td = curthread;
+	opts = mp->mnt_optnew;
+
+	if (vfs_filteropt(opts, ext2_opts))
+		return (EINVAL);
+
+	vfs_getopt(opts, "fspath", (void **)&path, NULL);
+	/* Double-check the length of path.. */
+	if (strlen(path) >= MAXMNTLEN - 1)
+		return (ENAMETOOLONG);
+
+	fspec = NULL;
+	error = vfs_getopt(opts, "from", (void **)&fspec, &len);
+	if (!error && fspec[len - 1] != '\0')
+		return (EINVAL);
+
+	/*
+	 * If updating, check whether changing from read-only to
+	 * read/write; if there is no device name, that's all we do.
+	 */
+	if (mp->mnt_flag & MNT_UPDATE) {
+		ump = VFSTOEXT2(mp);
+		fs = ump->um_e2fs; 
+		error = 0;
+		if (fs->e2fs_ronly == 0 &&
+		    vfs_flagopt(opts, "ro", NULL, 0)) {
+			error = VFS_SYNC(mp, MNT_WAIT);
+			if (error)
+				return (error);
+			flags = WRITECLOSE;
+			if (mp->mnt_flag & MNT_FORCE)
+				flags |= FORCECLOSE;
+			error = ext2_flushfiles(mp, flags, td);
+			if ( error == 0 && fs->e2fs_wasvalid && ext2_cgupdate(ump, MNT_WAIT) == 0) {
+				fs->e2fs->e2fs_state |= E2FS_ISCLEAN;
+				ext2_sbupdate(ump, MNT_WAIT);
 			}
+			fs->e2fs_ronly = 1;
+			vfs_flagopt(opts, "ro", &mp->mnt_flag, MNT_RDONLY);
+			DROP_GIANT();
+			g_topology_lock();
+			g_access(ump->um_cp, 0, -1, 0);
+			g_topology_unlock();
+			PICKUP_GIANT();
+		}
+		if (!error && (mp->mnt_flag & MNT_RELOAD))
+			error = ext2_reload(mp, td);
+		if (error)
+			return (error);
+		devvp = ump->um_devvp;
+		if (fs->e2fs_ronly && !vfs_flagopt(opts, "ro", NULL, 0)) {
+			if (ext2_check_sb_compat(fs->e2fs, devvp->v_rdev, 0))
+				return (EPERM);
+
+			/*
+			 * If upgrade to read-write by non-root, then verify
+			 * that user has necessary permissions on the device.
+			 */
+			vn_lock(devvp, LK_EXCLUSIVE | LK_RETRY);
+			error = VOP_ACCESS(devvp, VREAD | VWRITE,
+			    td->td_ucred, td);
+			if (error)
+				error = priv_check(td, PRIV_VFS_MOUNT_PERM);
+			if (error) {
+				VOP_UNLOCK(devvp, 0);
+				return (error);
+			}
+			VOP_UNLOCK(devvp, 0);
+			DROP_GIANT();
+			g_topology_lock();
+			error = g_access(ump->um_cp, 0, 1, 0);
+			g_topology_unlock();
+			PICKUP_GIANT();
+			if (error)
+				return (error);
+
+			if ((fs->e2fs->e2fs_state & E2FS_ISCLEAN) == 0 ||
+			    (fs->e2fs->e2fs_state & E2FS_ERRORS)) {
+				if (mp->mnt_flag & MNT_FORCE) {
+					printf(
+"WARNING: %s was not properly dismounted\n", fs->e2fs_fsmnt);
+				} else {
+					printf(
+"WARNING: R/W mount of %s denied.  Filesystem is not clean - run fsck\n",
+					    fs->e2fs_fsmnt);
+					return (EPERM);
+				}
+			}
+			fs->e2fs->e2fs_state &= ~E2FS_ISCLEAN;
+			(void)ext2_cgupdate(ump, MNT_WAIT);
+			fs->e2fs_ronly = 0;
+			MNT_ILOCK(mp);
+			mp->mnt_flag &= ~MNT_RDONLY;
+			MNT_IUNLOCK(mp);
+		}
+		if (vfs_flagopt(opts, "export", NULL, 0)) {
+			/* Process export requests in vfs_mount.c. */
+			return (error);
+		}
 	}
-	alert('Before choosing the "Diff vs. Selected Revision" option, you must select a revision by clicking its radio button.');
-	return false;
+
+	/*
+	 * Not an update, or updating the name: look up the name
+	 * and verify that it refers to a sensible disk device.
+	 */
+	if (fspec == NULL)
+		return (EINVAL);
+	NDINIT(ndp, LOOKUP, FOLLOW | LOCKLEAF, UIO_SYSSPACE, fspec, td);
+	if ((error = namei(ndp)) != 0)
+		return (error);
+	NDFREE(ndp, NDF_ONLY_PNBUF);
+	devvp = ndp->ni_vp;
+
+	if (!vn_isdisk(devvp, &error)) {
+		vput(devvp);
+		return (error);
+	}
+
+	/*
+	 * If mount by non-root, then verify that user has necessary
+	 * permissions on the device.
+	 *
+	 * XXXRW: VOP_ACCESS() enough?
+	 */
+	accmode = VREAD;
+	if ((mp->mnt_flag & MNT_RDONLY) == 0)
+		accmode |= VWRITE;
+	error = VOP_ACCESS(devvp, accmode, td->td_ucred, td);
+	if (error)
+		error = priv_check(td, PRIV_VFS_MOUNT_PERM);
+	if (error) {
+		vput(devvp);
+		return (error);
+	}
+
+	if ((mp->mnt_flag & MNT_UPDATE) == 0) {
+		error = ext2_mountfs(devvp, mp);
+	} else {
+		if (devvp != ump->um_devvp) {
+			vput(devvp);
+			return (EINVAL);	/* needs translation */
+		} else
+			vput(devvp);
+	}
+	if (error) {
+		vrele(devvp);
+		return (error);
+	}
+	ump = VFSTOEXT2(mp);
+	fs = ump->um_e2fs;
+
+	/*
+	 * Note that this strncpy() is ok because of a check at the start
+	 * of ext2_mount().
+	 */
+	strncpy(fs->e2fs_fsmnt, path, MAXMNTLEN);
+	fs->e2fs_fsmnt[MAXMNTLEN - 1] = '\0';
+	vfs_mountedfrom(mp, fspec);
+	return (0);
 }
-function showMenu(filename, id, menu, show, arg) {
-	if (m)
-		m.style.display='none'
-	m = document.getElementById('menu_'+menu)
-	if (!m)
-		return
-	finm = filename
-	if (mShw && arg == '')
-		args = '&mu='+mShw
+
+static int
+ext2_check_sb_compat(struct ext2fs *es, struct cdev *dev, int ronly)
+{
+
+	if (es->e2fs_magic != E2FS_MAGIC) {
+		printf("ext2fs: %s: wrong magic number %#x (expected %#x)\n",
+		    devtoname(dev), es->e2fs_magic, E2FS_MAGIC);
+		return (1);
+	}
+	if (es->e2fs_rev > E2FS_REV0) {
+		/*if (es->e2fs_features_incompat & ~EXT2F_INCOMPAT_SUPP) {*/
+                if (es->e2fs_features_incompat & ~EXT4F_INCOMPAT_SUPP) {
+			printf(
+"WARNING: mount of %s denied due to unsupported optional features\n",
+			    devtoname(dev));
+			return (1);
+		}
+		if (!ronly &&
+		    (es->e2fs_features_rocompat & ~EXT2F_ROCOMPAT_SUPP)) {
+			printf("WARNING: R/W mount of %s denied due to "
+			    "unsupported optional features\n", devtoname(dev));
+			return (1);
+		}
+	}
+	return (0);
+}
+
+/*
+ * This computes the fields of the  ext2_sb_info structure from the
+ * data in the ext2_super_block structure read in.
+ */
+static int
+compute_sb_data(struct vnode *devvp, struct ext2fs *es,
+    struct m_ext2fs *fs)
+{
+	int db_count, error;
+	int i;
+	int logic_sb_block = 1;	/* XXX for now */
+	struct buf *bp;
+
+	fs->e2fs_bsize = EXT2_MIN_BLOCK_SIZE << es->e2fs_log_bsize;
+	fs->e2fs_bshift = EXT2_MIN_BLOCK_LOG_SIZE + es->e2fs_log_bsize;
+	fs->e2fs_fsbtodb = es->e2fs_log_bsize + 1;
+	fs->e2fs_qbmask = fs->e2fs_bsize - 1;
+	fs->e2fs_blocksize_bits = es->e2fs_log_bsize + 10;
+	fs->e2fs_fsize = EXT2_MIN_FRAG_SIZE << es->e2fs_log_fsize;
+	if (fs->e2fs_fsize)
+		fs->e2fs_fpb = fs->e2fs_bsize / fs->e2fs_fsize;
+	fs->e2fs_bpg = es->e2fs_bpg;
+	fs->e2fs_fpg = es->e2fs_fpg;
+	fs->e2fs_ipg = es->e2fs_ipg;
+	if (es->e2fs_rev == E2FS_REV0) {
+		fs->e2fs_first_inode = E2FS_REV0_FIRST_INO;
+		fs->e2fs_isize = E2FS_REV0_INODE_SIZE ;
+	} else {
+		fs->e2fs_first_inode = es->e2fs_first_ino;
+		fs->e2fs_isize = es->e2fs_inode_size;
+		/*
+		 * Simple sanity check for superblock inode size value.
+		 */
+		if (fs->e2fs_isize < E2FS_REV0_INODE_SIZE  ||
+		    fs->e2fs_isize > fs->e2fs_bsize ||
+		    (fs->e2fs_isize & (fs->e2fs_isize - 1)) != 0) {
+			printf("EXT2-fs: invalid inode size %d\n",
+			    fs->e2fs_isize);
+			return (EIO);
+		}
+	}
+	fs->e2fs_ipb = fs->e2fs_bsize / EXT2_INODE_SIZE(fs);
+	fs->e2fs_itpg = fs->e2fs_ipg /fs->e2fs_ipb;
+	fs->e2fs_descpb = fs->e2fs_bsize / sizeof (struct ext2_gd);
+        fs->e2fs_descpbbits = find_most_set_bit(fs->e2fs_descpb);
+	/* s_resuid / s_resgid ? */
+	fs->e2fs_gcount = (((int64_t)(es->e2fs_bcount_hi) << 32 | es->e2fs_bcount_lo)
+            - es->e2fs_first_dblock + EXT2_BLOCKS_PER_GROUP(fs) - 1) /
+            EXT2_BLOCKS_PER_GROUP(fs);
+	db_count = (fs->e2fs_gcount + EXT2_DESC_PER_BLOCK(fs) - 1) /
+	    EXT2_DESC_PER_BLOCK(fs);
+	fs->e2fs_gdbcount = db_count;
+	fs->e2fs_gd = malloc(db_count * fs->e2fs_bsize,
+	    M_EXT2MNT, M_WAITOK);
+	fs->e2fs_contigdirs = malloc(fs->e2fs_gcount * sizeof(*fs->e2fs_contigdirs), 
+	    M_EXT2MNT, M_WAITOK);
+
+	/*
+	 * Adjust logic_sb_block.
+	 * Godmar thinks: if the blocksize is greater than 1024, then
+	 * the superblock is logically part of block zero.
+	 */
+	if(fs->e2fs_bsize > SBSIZE)
+		logic_sb_block = 0;
+	for (i = 0; i < db_count; i++) {
+		error = bread(devvp ,
+			 fsbtodb(fs, logic_sb_block + i + 1 ),
+			fs->e2fs_bsize, NOCRED, &bp);
+		if (error) {
+			free(fs->e2fs_gd, M_EXT2MNT);
+			brelse(bp);
+			return (error);
+		}
+		e2fs_cgload((struct ext2_gd *)bp->b_data,
+		    &fs->e2fs_gd[
+			i * fs->e2fs_bsize / sizeof(struct ext2_gd)],
+		    fs->e2fs_bsize);
+		brelse(bp);
+		bp = NULL;
+	}
+
+        /* initialize flex groups */
+        ext4_init_fg(fs);
+
+	fs->e2fs_total_dir = 0;
+	for (i=0; i < fs->e2fs_gcount; i++){
+		fs->e2fs_total_dir += (fs->e2fs_gd[i].ext2bgd_ndirs_lo);
+		fs->e2fs_contigdirs[i] = 0;
+	}
+	if (es->e2fs_rev == E2FS_REV0 ||
+	    (es->e2fs_features_rocompat & EXT2F_ROCOMPAT_LARGEFILE) == 0)
+		fs->e2fs_maxfilesize = 0x7fffffff;
 	else
-		args = arg
-	var n
-	var o
-	var i
-	var j = -1
-	while (j < 31) {
-		n = o = 1 << ++j
-		while (1) {
-			i = document.getElementById('id_mu'+menu+o)
-			if (i) {
-				if (show & n)
-				{
-					i.style.display=''
-					h = document.getElementById('id_mu'+menu+o+'h')
-					if (h)
-						h.style.display='none'
-				}
-				else
-				{
-					i.style.display='none'
-				}
-				if (n < 4)
-					break;
-				o++
+		fs->e2fs_maxfilesize = 0x7fffffffffffffff;
+
+        /* check inode size */
+        if (fs->e2fs_isize > E2FS_REV0_INODE_SIZE) {
+                fs->e2fs_want_extra_isize = sizeof(struct ext2fs_dinode) -
+                    E2FS_REV0_INODE_SIZE;
+
+                if (es->e2fs_features_rocompat & EXT4F_ROCOMPAT_EXTRA_ISIZE) {
+                        if (fs->e2fs_want_extra_isize < es->e2fs_want_extra_isize)
+                                fs->e2fs_want_extra_isize = es->e2fs_want_extra_isize;
+                        if (fs->e2fs_want_extra_isize < es->e2fs_min_extra_isize)
+                                fs->e2fs_want_extra_isize = es->e2fs_min_extra_isize;
+                }
+        }
+
+        if (E2FS_REV0_INODE_SIZE + fs->e2fs_want_extra_isize >
+            fs->e2fs_isize) {
+                printf("EXT2-fs: no space for extra inode.\n");
+                return (EIO);
+        }
+
+	return (0);
+}
+
+/*
+ * Initialize flex groups data structure.
+ */
+static int
+ext4_init_fg(struct m_ext2fs *fs)
+{
+        struct ext2fs *es = fs->e2fs;
+        int i, gpf = 0;
+        unsigned int fgcount, fg;
+        long nifree, nbfree, ndirs;
+
+        fs->e2fs_log_gpf = es->e2fs_log_gpf;
+        gpf = 1 << fs->e2fs_log_gpf;
+
+        if (gpf < 2) {
+                fs->e2fs_log_gpf = 0;
+                return (0);
+        }
+
+        fgcount = ((fs->e2fs_gcount + gpf - 1) +
+            ((es->e2fs_reserved_ngdb + 1) << fs->e2fs_descpbbits)) / gpf;
+
+        fs->e2fs_fg = malloc(fgcount * sizeof(struct ext4_flex_groups),
+            M_EXT2MNT, M_WAITOK | M_ZERO);
+
+        for (i = 0; i < fs->e2fs_gcount; i++) {
+                nifree = 0;
+                nbfree = 0;
+                ndirs = 0;
+                fg = i >> fs->e2fs_log_gpf;
+
+                /* XXX: need to support 64 bits. */
+                nifree = fs->e2fs_gd[i].ext2bgd_nifree_lo;
+                nbfree = fs->e2fs_gd[i].ext2bgd_nbfree_lo;
+                ndirs = fs->e2fs_gd[i].ext2bgd_ndirs_lo;
+
+                atomic_add_long(&fs->e2fs_fg[fg].e2fg_nifree, nifree);
+                atomic_add_long(&fs->e2fs_fg[fg].e2fg_nbfree, nbfree);
+                atomic_add_long(&fs->e2fs_fg[fg].e2fg_ndirs, ndirs);
+        }
+
+        return (0);
+}
+
+/*
+ * Find most significant set bit.
+ *
+ * TODO: Maybe it need to rewrite by assembly language for
+ * improving the performance.
+ */
+static int
+find_most_set_bit(int64_t n)
+{
+        int64_t num, i;
+        unsigned int pos, res = 0;
+
+        for (num = 1; num <= n; num++) {
+                for (i = (num >> 1), pos = 0; i != 0; pos++)
+                        i >>= 1;
+                res = pos;
+        }
+
+        return res;
+}
+
+/*
+ * Reload all incore data for a filesystem (used after running fsck on
+ * the root filesystem and finding things to fix). The filesystem must
+ * be mounted read-only.
+ *
+ * Things to do to update the mount:
+ *	1) invalidate all cached meta-data.
+ *	2) re-read superblock from disk.
+ *	3) re-read summary information from disk.
+ *	4) invalidate all inactive vnodes.
+ *	5) invalidate all cached file data.
+ *	6) re-read inode data for all active vnodes.
+ * XXX we are missing some steps, in particular # 3, this has to be reviewed.
+ */
+static int
+ext2_reload(struct mount *mp, struct thread *td)
+{
+	struct vnode *vp, *mvp, *devvp;
+	struct inode *ip;
+	struct buf *bp;
+	struct ext2fs *es;
+	struct m_ext2fs *fs;
+	int error;
+
+	if ((mp->mnt_flag & MNT_RDONLY) == 0)
+		return (EINVAL);
+	/*
+	 * Step 1: invalidate all cached meta-data.
+	 */
+	devvp = VFSTOEXT2(mp)->um_devvp;
+	vn_lock(devvp, LK_EXCLUSIVE | LK_RETRY);
+	if (vinvalbuf(devvp, 0, 0, 0) != 0)
+		panic("ext2_reload: dirty1");
+	VOP_UNLOCK(devvp, 0);
+
+	/*
+	 * Step 2: re-read superblock from disk.
+	 * constants have been adjusted for ext2
+	 */
+	if ((error = bread(devvp, SBLOCK, SBSIZE, NOCRED, &bp)) != 0)
+		return (error);
+	es = (struct ext2fs *)bp->b_data;
+	if (ext2_check_sb_compat(es, devvp->v_rdev, 0) != 0) {
+		brelse(bp);
+		return (EIO);		/* XXX needs translation */
+	}
+	fs = VFSTOEXT2(mp)->um_e2fs;
+	bcopy(bp->b_data, fs->e2fs, sizeof(struct ext2fs));
+
+	if((error = compute_sb_data(devvp, es, fs)) != 0) {
+		brelse(bp);
+		return (error);
+	}
+#ifdef UNKLAR
+	if (fs->fs_sbsize < SBSIZE)
+		bp->b_flags |= B_INVAL;
+#endif
+	brelse(bp);
+
+loop:
+	MNT_ILOCK(mp);
+	MNT_VNODE_FOREACH(vp, mp, mvp) {
+		VI_LOCK(vp);
+		if (vp->v_iflag & VI_DOOMED) {
+			VI_UNLOCK(vp);
+			continue;
+		}
+		MNT_IUNLOCK(mp);
+		/*
+		 * Step 4: invalidate all cached file data.
+		 */
+		if (vget(vp, LK_EXCLUSIVE | LK_INTERLOCK, td)) {
+			MNT_VNODE_FOREACH_ABORT(mp, mvp);
+			goto loop;
+		}
+		if (vinvalbuf(vp, 0, 0, 0))
+			panic("ext2_reload: dirty2");
+
+		/*
+		 * Step 5: re-read inode data for all active vnodes.
+		 */
+		ip = VTOI(vp);
+		error = bread(devvp, fsbtodb(fs, ino_to_fsba(fs, ip->i_number)),
+		    (int)fs->e2fs_bsize, NOCRED, &bp);
+		if (error) {
+			VOP_UNLOCK(vp, 0);
+			vrele(vp);
+			MNT_VNODE_FOREACH_ABORT(mp, mvp);
+			return (error);
+		}
+		ext2_ei2i((struct ext2fs_dinode *) ((char *)bp->b_data +
+		    EXT2_INODE_SIZE(fs) * ino_to_fsbo(fs, ip->i_number)), ip);
+		brelse(bp);
+		VOP_UNLOCK(vp, 0);
+		vrele(vp);
+		MNT_ILOCK(mp);
+	}
+	MNT_IUNLOCK(mp);
+	return (0);
+}
+
+/*
+ * Common code for mount and mountroot.
+ */
+static int
+ext2_mountfs(struct vnode *devvp, struct mount *mp)
+{
+	struct ext2mount *ump;
+	struct buf *bp;
+	struct m_ext2fs *fs;
+	struct ext2fs *es;
+	struct cdev *dev = devvp->v_rdev;
+	struct g_consumer *cp;
+	struct bufobj *bo;
+	int error;
+	int ronly;
+
+	ronly = vfs_flagopt(mp->mnt_optnew, "ro", NULL, 0);
+	/* XXX: use VOP_ACESS to check FS perms */
+	DROP_GIANT();
+	g_topology_lock();
+	error = g_vfs_open(devvp, &cp, "ext2fs", ronly ? 0 : 1);
+	g_topology_unlock();
+	PICKUP_GIANT();
+	VOP_UNLOCK(devvp, 0);
+	if (error)
+		return (error);
+
+	/* XXX: should we check for some sectorsize or 512 instead? */
+	if (((SBSIZE % cp->provider->sectorsize) != 0) ||
+	    (SBSIZE < cp->provider->sectorsize)) {
+		DROP_GIANT();
+		g_topology_lock();
+		g_vfs_close(cp);
+		g_topology_unlock();
+		PICKUP_GIANT();
+		return (EINVAL);
+	}
+
+	bo = &devvp->v_bufobj;
+	bo->bo_private = cp;
+	bo->bo_ops = g_vfs_bufops;
+	if (devvp->v_rdev->si_iosize_max != 0)
+		mp->mnt_iosize_max = devvp->v_rdev->si_iosize_max;
+	if (mp->mnt_iosize_max > MAXPHYS)
+		mp->mnt_iosize_max = MAXPHYS;
+
+	bp = NULL;
+	ump = NULL;
+	if ((error = bread(devvp, SBLOCK, SBSIZE, NOCRED, &bp)) != 0)
+		goto out;
+	es = (struct ext2fs *)bp->b_data;
+	if (ext2_check_sb_compat(es, dev, ronly) != 0) {
+		error = EINVAL;		/* XXX needs translation */
+		goto out;
+	}
+	if ((es->e2fs_state & E2FS_ISCLEAN) == 0 ||
+	    (es->e2fs_state & E2FS_ERRORS)) {
+		if (ronly || (mp->mnt_flag & MNT_FORCE)) {
+			printf(
+"WARNING: Filesystem was not properly dismounted\n");
+		} else {
+			printf(
+"WARNING: R/W mount denied.  Filesystem is not clean - run fsck\n");
+			error = EPERM;
+			goto out;
+		}
+	}
+	ump = malloc(sizeof *ump, M_EXT2MNT, M_WAITOK);
+	bzero((caddr_t)ump, sizeof *ump);
+
+	/*
+	 * I don't know whether this is the right strategy. Note that
+	 * we dynamically allocate both an ext2_sb_info and an ext2_super_block
+	 * while Linux keeps the super block in a locked buffer.
+	 */
+	ump->um_e2fs = malloc(sizeof(struct m_ext2fs),
+		M_EXT2MNT, M_WAITOK);
+	ump->um_e2fs->e2fs = malloc(sizeof(struct ext2fs),
+		M_EXT2MNT, M_WAITOK);
+	mtx_init(EXT2_MTX(ump), "EXT2FS", "EXT2FS Lock", MTX_DEF);
+	bcopy(es, ump->um_e2fs->e2fs, (u_int)sizeof(struct ext2fs));
+	if ((error = compute_sb_data(devvp, ump->um_e2fs->e2fs, ump->um_e2fs)))
+		goto out;
+
+	/* Initial reservation window index and lock */
+	bzero(&ump->um_e2fs->e2fs_rsv_lock, sizeof(struct mtx));
+	mtx_init(&ump->um_e2fs->e2fs_rsv_lock,
+            "rsv tree lock", NULL, MTX_DEF);
+	RB_INIT(&ump->um_e2fs->e2fs_rsv_tree);
+
+	brelse(bp);
+	bp = NULL;
+	fs = ump->um_e2fs;
+	fs->e2fs_ronly = ronly;	/* ronly is set according to mnt_flags */
+
+	/*
+	 * If the fs is not mounted read-only, make sure the super block is
+	 * always written back on a sync().
+	 */
+	fs->e2fs_wasvalid = fs->e2fs->e2fs_state & E2FS_ISCLEAN ? 1 : 0;
+	if (ronly == 0) {
+		fs->e2fs_fmod = 1;		/* mark it modified */
+		fs->e2fs->e2fs_state &= ~E2FS_ISCLEAN;	/* set fs invalid */
+	}
+	mp->mnt_data = ump;
+	mp->mnt_stat.f_fsid.val[0] = dev2udev(dev);
+	mp->mnt_stat.f_fsid.val[1] = mp->mnt_vfc->vfc_typenum;
+	mp->mnt_maxsymlinklen = EXT2_MAXSYMLINKLEN;
+	MNT_ILOCK(mp);
+	mp->mnt_flag |= MNT_LOCAL;
+	MNT_IUNLOCK(mp);
+	ump->um_mountp = mp;
+	ump->um_dev = dev;
+	ump->um_devvp = devvp;
+	ump->um_bo = &devvp->v_bufobj;
+	ump->um_cp = cp;
+
+	/*
+	 * Setting those two parameters allowed us to use
+	 * ufs_bmap w/o changse!
+	 */
+	ump->um_nindir = EXT2_ADDR_PER_BLOCK(fs);
+	ump->um_bptrtodb = fs->e2fs->e2fs_log_bsize + 1;
+	ump->um_seqinc = EXT2_FRAGS_PER_BLOCK(fs);
+	if (ronly == 0)
+		ext2_sbupdate(ump, MNT_WAIT);
+	/*
+	 * Initialize filesystem stat information in mount struct.
+	 */
+	MNT_ILOCK(mp);
+ 	mp->mnt_kern_flag |= MNTK_MPSAFE | MNTK_LOOKUP_SHARED |
+            MNTK_EXTENDED_SHARED;
+	MNT_IUNLOCK(mp);
+	return (0);
+out:
+	if (bp)
+		brelse(bp);
+	if (cp != NULL) {
+		DROP_GIANT();
+		g_topology_lock();
+		g_vfs_close(cp);
+		g_topology_unlock();
+		PICKUP_GIANT();
+	}
+	if (ump) {
+	  	mtx_destroy(EXT2_MTX(ump));
+		free(ump->um_e2fs->e2fs_gd, M_EXT2MNT);
+		free(ump->um_e2fs->e2fs_contigdirs, M_EXT2MNT);
+		free(ump->um_e2fs->e2fs, M_EXT2MNT);
+		free(ump->um_e2fs, M_EXT2MNT);
+		free(ump, M_EXT2MNT);
+		mp->mnt_data = NULL;
+	}
+	return (error);
+}
+
+/*
+ * Unmount system call.
+ */
+static int
+ext2_unmount(struct mount *mp, int mntflags)
+{
+	struct ext2mount *ump;
+	struct m_ext2fs *fs;
+	int error, flags, ronly;
+
+	flags = 0;
+	if (mntflags & MNT_FORCE) {
+		if (mp->mnt_flag & MNT_ROOTFS)
+			return (EINVAL);
+		flags |= FORCECLOSE;
+	}
+	if ((error = ext2_flushfiles(mp, flags, curthread)) != 0)
+		return (error);
+	ump = VFSTOEXT2(mp);
+	fs = ump->um_e2fs;
+	ronly = fs->e2fs_ronly;
+	if (ronly == 0 && ext2_cgupdate(ump, MNT_WAIT) == 0) {
+		if (fs->e2fs_wasvalid)
+ 			fs->e2fs->e2fs_state |= E2FS_ISCLEAN;
+ 		ext2_sbupdate(ump, MNT_WAIT);
+	}
+
+	DROP_GIANT();
+	g_topology_lock();
+	g_vfs_close(ump->um_cp);
+	g_topology_unlock();
+	PICKUP_GIANT();
+	vrele(ump->um_devvp);
+	mtx_destroy(&fs->e2fs_rsv_lock);
+        free(fs->e2fs_fg, M_EXT2MNT);
+	free(fs->e2fs_gd, M_EXT2MNT);
+	free(fs->e2fs_contigdirs, M_EXT2MNT);
+	free(fs->e2fs, M_EXT2MNT);
+	free(fs, M_EXT2MNT);
+	free(ump, M_EXT2MNT);
+	mp->mnt_data = NULL;
+	MNT_ILOCK(mp);
+	mp->mnt_flag &= ~MNT_LOCAL;
+	MNT_IUNLOCK(mp);
+	return (error);
+}
+
+/*
+ * Flush out all the files in a filesystem.
+ */
+static int
+ext2_flushfiles(struct mount *mp, int flags, struct thread *td)
+{
+	int error;
+
+	error = vflush(mp, 0, flags, td);
+	return (error);
+}
+/*
+ * Get file system statistics.
+ */
+int
+ext2_statfs(struct mount *mp, struct statfs *sbp)
+{
+	struct ext2mount *ump;
+	struct m_ext2fs *fs;
+	uint32_t overhead, overhead_per_group, ngdb;
+	int i, ngroups;
+
+	ump = VFSTOEXT2(mp);
+	fs = ump->um_e2fs;
+	if (fs->e2fs->e2fs_magic != E2FS_MAGIC)
+		panic("ext2fs_statvfs");
+
+	/*
+	 * Compute the overhead (FS structures)
+	 */
+	overhead_per_group =
+	    1 /* block bitmap */ +
+	    1 /* inode bitmap */ +
+	    fs->e2fs_itpg;
+	overhead = fs->e2fs->e2fs_first_dblock +
+	    fs->e2fs_gcount * overhead_per_group;
+	if (fs->e2fs->e2fs_rev > E2FS_REV0 &&
+	    fs->e2fs->e2fs_features_rocompat & EXT2F_ROCOMPAT_SPARSESUPER) {
+		for (i = 0, ngroups = 0; i < fs->e2fs_gcount; i++) {
+			if (cg_has_sb(i))
+				ngroups++;
+		}
+	} else {
+		ngroups = fs->e2fs_gcount;
+	}
+	ngdb = fs->e2fs_gdbcount;
+	if (fs->e2fs->e2fs_rev > E2FS_REV0 &&
+	    fs->e2fs->e2fs_features_compat & EXT2F_COMPAT_RESIZE)
+		ngdb += fs->e2fs->e2fs_reserved_ngdb;
+	overhead += ngroups * (1 /* superblock */ + ngdb);
+
+	sbp->f_bsize = EXT2_FRAG_SIZE(fs);
+	sbp->f_iosize = EXT2_BLOCK_SIZE(fs);
+	sbp->f_blocks = ((int64_t)(fs->e2fs->e2fs_bcount_hi) << 32 |
+            fs->e2fs->e2fs_bcount_lo) - overhead;
+	sbp->f_bfree = ((int64_t)(fs->e2fs->e2fs_fbcount_hi) << 32 |
+            fs->e2fs->e2fs_fbcount_lo);
+	sbp->f_bavail = sbp->f_bfree - ((int64_t)(fs->e2fs->e2fs_rbcount_hi) << 32 |
+            fs->e2fs->e2fs_rbcount_lo);
+	sbp->f_files = fs->e2fs->e2fs_icount;
+	sbp->f_ffree = fs->e2fs->e2fs_ficount;
+	return (0);
+}
+
+/*
+ * Go through the disk queues to initiate sandbagged IO;
+ * go through the inodes to write those that have been modified;
+ * initiate the writing of the super block if it has been modified.
+ *
+ * Note: we are always called with the filesystem marked `MPBUSY'.
+ */
+static int
+ext2_sync(struct mount *mp, int waitfor)
+{
+	struct vnode *mvp, *vp;
+	struct thread *td;
+	struct inode *ip;
+	struct ext2mount *ump = VFSTOEXT2(mp);
+	struct m_ext2fs *fs;
+	int error, allerror = 0;
+
+	td = curthread;
+	fs = ump->um_e2fs;
+	if (fs->e2fs_fmod != 0 && fs->e2fs_ronly != 0) {		/* XXX */
+		printf("fs = %s\n", fs->e2fs_fsmnt);
+		panic("ext2_sync: rofs mod");
+	}
+
+	/*
+	 * Write back each (modified) inode.
+	 */
+	MNT_ILOCK(mp);
+loop:
+	MNT_VNODE_FOREACH(vp, mp, mvp) {
+		VI_LOCK(vp);
+		if (vp->v_type == VNON || (vp->v_iflag & VI_DOOMED)) {
+			VI_UNLOCK(vp);
+			continue;
+		}
+		MNT_IUNLOCK(mp);
+		ip = VTOI(vp);
+		if ((ip->i_flag &
+		    (IN_ACCESS | IN_CHANGE | IN_MODIFIED | IN_UPDATE)) == 0 &&
+		    (vp->v_bufobj.bo_dirty.bv_cnt == 0 ||
+		    waitfor == MNT_LAZY)) {
+			VI_UNLOCK(vp);
+			MNT_ILOCK(mp);
+			continue;
+		}
+		error = vget(vp, LK_EXCLUSIVE | LK_NOWAIT | LK_INTERLOCK, td);
+		if (error) {
+			MNT_ILOCK(mp);
+			if (error == ENOENT) {
+				MNT_VNODE_FOREACH_ABORT_ILOCKED(mp, mvp);
+				goto loop;
 			}
-			else
-				break
+			continue;
 		}
+		if ((error = VOP_FSYNC(vp, waitfor, td)) != 0)
+			allerror = error;
+		VOP_UNLOCK(vp, 0);
+		vrele(vp);
+		MNT_ILOCK(mp);
 	}
-	i = document.getElementById('id_'+id)
-	var t = i.offsetTop
-	var p = i.offsetParent
-	var l = i.offsetLeft
-	while (p.tagName != 'BODY') {
-		t = t + p.offsetTop
-		l = l + p.offsetLeft
-		p = p.offsetParent
+	MNT_IUNLOCK(mp);
+
+	/*
+	 * Force stale file system control information to be flushed.
+	 */
+	if (waitfor != MNT_LAZY) {
+		vn_lock(ump->um_devvp, LK_EXCLUSIVE | LK_RETRY);
+		if ((error = VOP_FSYNC(ump->um_devvp, waitfor, td)) != 0)
+			allerror = error;
+		VOP_UNLOCK(ump->um_devvp, 0);
 	}
-	m.style.top = t + i.offsetHeight + 1
-	m.style.left = l - 8
-	m.style.display=''
-}
-function setmushow(show) {
-	mShw = show
-}
-function runcmd(cmd) {
-	var url = finm + "?ac=" + cmd + args;
-	window.location = url;
-}
-function runurl(url) {
-	window.location = url;
-}
-function runuXc(url, cmd) {
-	var newurl = url + finm + cmd;
-	window.location = newurl;
-}
-function promptuXc(str, url, cmd) {
-	var val=prompt(str, '')
-	if (val!=null && val!='')
-	{
-		var newurl = url + val
-		runuXc(newurl, cmd)
+
+	/*
+	 * Write back modified superblock.
+	 */
+	if (fs->e2fs_fmod != 0) {
+		fs->e2fs_fmod = 0;
+		fs->e2fs->e2fs_wtime = time_second;
+		if ((error = ext2_cgupdate(ump, waitfor)) != 0)
+			allerror = error;
 	}
+	return (allerror);
 }
-function showhi(id)
+
+/*
+ * Look up an EXT2FS dinode number to find its incore vnode, otherwise read it
+ * in from disk.  If it is in core, wait for the lock bit to clear, then
+ * return the inode locked.  Detection and handling of mount points must be
+ * done by the calling routine.
+ */
+static int
+ext2_vget(struct mount *mp, ino_t ino, int flags, struct vnode **vpp)
 {
-	document.getElementById(id + 'p').style.display='none'
-	document.getElementById(id + 'h').style.display=''
-}
-function hidehi(id)
-{
-	document.getElementById(id + 'p').style.display=''
-	document.getElementById(id + 'h').style.display='none'
-}
-function check4ESC(e) {
-	if (m) {
-		var kC  = (window.event) ? event.keyCode : e.keyCode;
-		var Esc = (window.event) ? 27 : e.DOM_VK_ESCAPE
-	      	if (kC==Esc) {
-			m.style.display='none'
-			m = 0
-		}
+	struct m_ext2fs *fs;
+	struct inode *ip;
+	struct ext2mount *ump;
+	struct buf *bp;
+	struct vnode *vp;
+	struct cdev *dev;
+	struct thread *td;
+	int error;
+	int i, used_blocks;
+
+	td = curthread;
+	error = vfs_hash_get(mp, ino, flags, td, vpp, NULL, NULL);
+	if (error || *vpp != NULL)
+		return (error);
+
+	ump = VFSTOEXT2(mp);
+	dev = ump->um_dev;
+
+	/*
+	 * If this malloc() is performed after the getnewvnode()
+	 * it might block, leaving a vnode with a NULL v_data to be
+	 * found by ext2_sync() if a sync happens to fire right then,
+	 * which will cause a panic because ext2_sync() blindly
+	 * dereferences vp->v_data (as well it should).
+	 */
+	ip = malloc(sizeof(struct inode), M_EXT2NODE, M_WAITOK | M_ZERO);
+
+	/* Allocate a new vnode/inode. */
+	if ((error = getnewvnode("ext2fs", mp, &ext2_vnodeops, &vp)) != 0) {
+		*vpp = NULL;
+		free(ip, M_EXT2NODE);
+		return (error);
 	}
-        return true;
-}
-document.onkeyup = check4ESC;
-//--></script>
-  <Style type="text/css"><!--
-  A { text-decoration: none }
-  A:link { text-decoration: none; color: #0000CC; font-family: verdana,arial,helvetica,sans-serif; font-size: 12px }
-  A:visited { text-decoration: none; color: #0000CC; font-family: verdana,arial,helvetica,sans-serif; font-size: 12px }
-  A:hover { text-decoration: underline; color: #0000CC; font-family: verdana,arial,helvetica,sans-serif; font-size: 12px }
-  A.status:link { text-decoration: none; color: #FFFFFF; font-family: verdana,arial,helvetica,sans-serif; font-size: 11px }
-  A.status:visited { text-decoration: none; color: #FFFFFF; font-family: verdana,arial,helvetica,sans-serif; font-size: 11px }
-  A.status:hover { text-decoration: underline; color: #FFFFFF font-family: verdana,arial,helvetica,sans-serif; font-size: 11px }
-  A.nav_link:link { text-decoration: none; color: #0000CC; font-family: verdana,arial,helvetica,sans-serif; font-size: 11px }
-  A.nav_link:visited { text-decoration: none; color: #0000CC; font-family: verdana,arial,helvetica,sans-serif; font-size: 11px }
-  A.nav_link:hover { text-decoration: underline; color: #0000CC; font-family: verdana,arial,helvetica,sans-serif; font-size: 11px }
-  A.tab:link { text-decoration: none; color: #000000; font-family: verdana,arial,helvetica,sans-serif; font-size: 11px; font-weight: bold }
-  A.tab:visited { text-decoration: none; color: #000000; font-family: verdana,arial,helvetica,sans-serif; font-size: 11px; font-weight: bold }
-  A.tab:hover { text-decoration: underline; color: #000000; font-family: verdana,arial,helvetica,sans-serif; font-size: 11px; font-weight: bold }
-  A.path:link { text-decoration: none; color: #0000CC; font-family: verdana,arial,helvetica,sans-serif; font-size: 14px; font-weight: bold }
-  A.path:visited { text-decoration: none; color: #0000CC; font-family: verdana,arial,helvetica,sans-serif; font-size: 14px; font-weight: bold }
-  A.path:hover { text-decoration: underline; color: #0000CC; font-family: verdana,arial,helvetica,sans-serif; font-size: 14px; font-weight: bold }
-  A.remote:link { text-decoration: none; color: #0000CC; font-family: verdana,arial,helvetica,sans-serif; font-size: 10px; font-weight: bold }
-  A.remote:visited { text-decoration: none; color: #0000CC; font-family: verdana,arial,helvetica,sans-serif; font-size: 10px; font-weight: bold }
-  A.remote:hover { text-decoration: underline; color: #0000CC; font-family: verdana,arial,helvetica,sans-serif; font-size: 10px; font-weight: bold }
-  A.file:link { text-decoration: none; color: #0000CC; font-family: verdana,arial,helvetica,sans-serif; font-size: 12px; font-weight: bold }
-  A.file:visited { text-decoration: none; color: #0000CC; font-family: verdana,arial,helvetica,sans-serif; font-size: 12px; font-weight: bold }
-  A.file:hover { text-decoration: underline; color: #0000CC; font-family: verdana,arial,helvetica,sans-serif; font-size: 12px; font-weight: bold }
-  A.bigger:link, A.bigger:visited { text-decoration: none color: #0000FF; font-family: verdana,arial,helvetica,sans-serif; font-size: 14px }
-  A.fixed:link { text-decoration: none; color: #0000CC; font-family: monospace,verdana,arial,helvetica,sans-serif; font-size: 12px; font-weight: normal }
-  A.fixed:visited { text-decoration: none; color: #0000CC; font-family: monospace,verdana,arial,helvetica,sans-serif; font-size: 12px; font-weight: normal }
-  A.fixed:hover { text-decoration: underline; color: #0000CC; font-family: monospace,verdana,arial,helvetica,sans-serif; font-size: 12px; font-weight: normal }
-  TD { font-family: verdana,arial,helvetica,sans-serif; font-size: 12px; font-weight: normal; color: #000000 }
-  TH { font-family: verdana,arial,helvetica,sans-serif; font-size: 11px; font-weight: bold; color: #000000 }
-  TD.recent_activity { font-family: verdana,arial,helvetica,sans-serif; font-size: 11px; padding-left: 3px; padding-right: 3px; padding-top: 3px; padding-bottom: 3px }
-  UL.none { list-style-type: none }
-  DT { font-family: verdana,arial,helvetica,sans-serif; font-size: 12px; font-weight: bold; color: #000000 }
-  DD { font-family: verdana,arial,helvetica,sans-serif; font-size: 12px; font-weight: normal; color: #000000 }
-  table.fHeader { border: 0px; width: 100%; background: #115577 url(/headerBkgrndIcon?ac=20) repeat-x top left;}
-  .logo {padding: 4px 15px 7px 7px; width: 114px;}
-  .tabsspr { background: #c4c3c3 url(/tabBackgroundIcon?ac=20) repeat-x top left; border-left: 1px solid #eeeeee; padding: 2px 0px 2px 0px; }
-  .tabs { background: #c4c3c3 url(/tabBackgroundIcon?ac=20) repeat-x top left; border-right: 1px solid #7f7f7f; border-left: 1px solid #eeeeee; padding: 2px 0px 2px 0px; }
-  td.tabs:hover,
-  .actab { background: #eeeeee url(/activeTabBackgroundIcon?ac=20) repeat-x top left; border-right: 1px solid #7f7f7f; border-left: 1px solid #eeeeee; padding: 2px 0px 2px 0px; }
-  .tabs a,
-  .actab a { padding: 1px 10px 1px 2px; }
-  .fSmall { font-family: verdana,arial,helvetica,sans-serif; font-size: 12px }
-  .fSmaller { font-family: verdana,arial,helvetica,sans-serif; font-size: 10px }
-  .fNormal { font-family: verdana,arial,helvetica,sans-serif; font-size: 14px }
-  .doublespace { font-family: verdana,arial,helvetica,sans-serif; font-size: 14px; font-weight: normal; line-height: 180% }
-  .statusLabel { font-family: verdana,arial,helvetica,sans-serif; font-size: 10px; font-weight: bold; color: #FFCC66; padding: 4px 5px 0px 0px;}
-  .statusPath { font-family: verdana,arial,helvetica,sans-serif; font-size: 10px; font-weight: bold; color: #FFCC66; padding: 0px 5px 0px 0px; }
-  .pathField,
-  .connectionField,
-  .status { font-family: verdana,arial,helvetica,sans-serif; font-size: 11px; color: #FFFFFF }
-  .pathField { padding: 0px 0px 5px 0px; white-space: nowrap; }
-  .connectionField { padding: 4px 60px 0px 0px;}
-  .tab { font-family: verdana,arial,helvetica,sans-serif; color: #000000; font-size: 11px; font-weight: bold }
-  .version { font-family: verdana,arial,helvetica,sans-serif; font-size: 10px; color: #999999 }
-  .remote { font-family: verdana,arial,helvetica,sans-serif; font-size: 10px; color: #996d02 }
-  .title { font-family: verdana,arial,helvetica,sans-serif; font-size: 18px; font-weight: bold; color: #000000 }
-  .copyright { font-family: verdana,arial,helvetica,sans-serif; font-size: 11px; font-style: italic; color: #999999 }
-  .path { font-family: verdana,arial,helvetica,sans-serif; font-size: 14px; font-weight: bold; vertical-align: top }
-  .label { font-family: verdana,arial,helvetica,sans-serif; font-size: 12px; font-weight: bold; color: #000000 }
-  .normal { font-family: verdana,arial,helvetica,sans-serif; font-size: 12px; font-weight: normal; color: #000000 }
-  .fixed { font-family: monospace,verdana,arial,helvetica,sans-serif; font-size: 12px; font-weight: normal; color: #000000 }
-  .subtitle { font-family: verdana,arial,helvetica,sans-serif; font-size: 14px; font-weight: bold; color: #000000; text-align: left }
-  .filestat { font-family: verdana,arial,helvetica,sans-serif; font-size: 10px; color: #999999; }
-  .filestat A:link,
-  .filestat A:visited,
-  .filestat A:hover { text-decoration: none; }
-  .pre { text-decoration: none; font-family: monospace; font-size: 12px; font-weight: normal; color: #000000 }
-  .pre A:link { text-decoration: none; font-family: monospace; font-size: 12px; font-weight: normal; color: #000000 }
-  .pre A:visited { text-decoration: none; font-family: monospace; font-size: 12px; font-weight: normal; color: #000000 }
-  .pre A:hover { text-decoration: none; font-family: monospace; font-size: 12px; font-weight: normal; color: #000000 }
-  TR.b td {margin: 0; border-style: solid; border-width: 0px; border-bottom: 1px solid #E8EAEC;}
-  .ttip { border-style: solid; border-color: #000000; border-width: 1px; background-color: #FFFFF0; padding: 5; position: absolute; font-family: arial,sans-serif; font-size: 12px; }
-  .mu { border-style: solid; border-color: #C0C0C0; border-width: 2px; background-color: #E6E6E6; padding: 0; position: absolute; }
-  .mu div:hover { background-color: #008; }
-  .mu div:hover a { text-decoration: none; color: #ffffff }
-  .mu div {padding: 1 0 1 0;}
-  .mu div div {padding: 0;}
-  .muaro { background-image: url(/menuarrowIcon?ac=20); background-repeat: no-repeat; background-position: center left; }
-  .muaro A:hover { background-image: url(/menuarrowhoverIcon?ac=20); background-repeat: no-repeat; background-position: center left; text-decoration: none; }
-  TD.thumbnail_pane { border-style: solid; border-width: 1px; border-color: #7F7F7F }
-  TR.list_row td { padding: 1px 0px; }
-  TR.pathbr_row td { padding: 2px 0px;}
-  div.alt_row,
-  TR.alt_row { background: #f1f5fa;}
-  div.menu { position: relative; cursor: default}
-  div.menu ul { visibility: hidden; position: absolute; top: -20px; left: 90%; margin: 0; padding: 0 }
-  div.menu:hover > ul { visibility: visible}
-  .menu ul li { display: list-item; list-style: url(/notselectedIcon?ac=20) none inside; padding: 0.2em 4 0 4; white-space: nowrap}
-  .menu ul li:hover { background-color: #008}
-  .menu ul li.divider { list-style: none outside; border-color: #7F7F7F; border-width: 1px 0px 0px 0px; border-style: solid; padding: 0 0 0 0; margin: 2px 0 0 0; line-height: 1px; height: 1px; }
-  .menu ul li.checkmark { list-style: url(/checkmarkIcon?ac=20) disc inside; }
-  .menu ul li.checkmark:hover { list-style: url(/checkmarkhighlightedIcon?ac=20) disc inside; }
-  .menu ul li.bullet { list-style: url(/bulletIcon?ac=20) disc inside; }
-  .menu ul li.bullet:hover { list-style: url(/bullethighlightedIcon?ac=20) disc inside; }
-  .menu ul li a:link,
-  .menu ul li a:visited { text-decoration: none; color: #0000CC; }
-  .menu ul li:hover a:link,
-  .menu ul li:hover a:visited { text-decoration: none; color: #ffffff; }
-  table.rev_history { width: 100%; border: 1px solid #7F7F7F; background: #ffffff;}
-  table.rev_history th {padding: 2px 8px; background: #EEEEEE; text-align: left;}
-  table.rev_history td {margin: 0; padding: 3px 8px; vertical-align: top;}
-  table.rev_history td.top_line {margin: 0; border-top: 1px solid #d1d5da; padding: 3px 8px; vertical-align: top;}
-  table.rev_history tr.top_row td {border-top: 1px solid #7F7F7F;}
-  table.rev_history tr.alt_row {background: #f1f5fa;}
-  div#showhideBlock { display: block; }
-  div#hideBlockIcon { display: inline; }
-  div#showBlockIcon { display: none; }
-  div#showhideInline1 { display: inline; }
-  div#showhideInline2 { display: inline; }
-  div#showhideInline3 { display: inline; }
-  div#showhideInline4 { display: none; }
-  div#showhideBlock9 { display: block; }
-  div#hideBlockIcon9 { display: inline; }
-  div#showBlockIcon9 { display: none; }
-  --></Style>
-  <Base href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c&ra=s&rg=b&c=l5R@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/">
-<link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
-<meta name="viewport" content="width=760, initial-scale=0.4, minimum-scale=0.4" />
-</Head>
-<Body bgcolor="#ffffff" leftmargin="0" topmargin="0" marginwidth="0" marginheight="0" onClick="hideMenu()">
-<!-- BEGIN INFO PANE -->
-<Table Border="0" Width="100%" Cellpadding="0" Cellspacing="1">
-<tr>
-<td>
-<Table Border="0" Width="100%" Cellpadding="0" Cellspacing="1" Bgcolor="#7F7F7F">
-<tr>
-<td colspan="5">
-<Table Border="0" Width="100%" Cellpadding="0" Cellspacing="0" class="fHeader">
-<tr>
-<td valign="middle" rowspan="2" class="logo">
-<img src="/logoviewerIcon?ac=20" height="46" width="114" border="0" alt="" title="" vspace="0"></td>
-<td class="statusLabel">
-Server:
-</td>
-<td width="100%">
-<Table Border="0" Cellspacing="0">
-<tr>
-<td class="connectionField">
-<a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c&ra=s&rg=b&c=l5R@//?ac=151" class="status">perforce.freebsd.org:1666
-</a>
-</td>
-<td class="statusLabel">
-Client:
-<td class="connectionField">
-realcgi
-</td>
-</tr>
-</Table>
-</td>
-</tr>
-<tr>
-<td class="statusPath">
-Path:
-</td>
-<Form method="POST" enctype="application/x-www-form-urlencoded" action="ext4_vfsops.c?ac=152">
-<td class="pathField">
-<Input type=text name="goField" value="//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c" size="92">
-&nbsp;
-<Input type=submit name="Go" value="Go">
-</td>
-</Form>
-</tr>
-</Table>
-<!-- END INFO PANE -->
-<!-- BEGIN MENU BAR PANE -->
-<script language="JavaScript1.2">
-function go( selId ) {
-location = selId.options[selId.selectedIndex].value
-}
+	vp->v_data = ip;
+	ip->i_vnode = vp;
+	ip->i_e2fs = fs = ump->um_e2fs;
+	ip->i_ump  = ump;
+	ip->i_number = ino;
 
-function setCheckedValue(radioObj, newValue) {
- if(!radioObj)
-	return;
- var radioLength = radioObj.length;
- if(radioLength == undefined) {
-	radioObj.checked = (radioObj.value == newValue.toString());
-	return;
- }
- for(var i = 0; i < radioLength; i++) {
-	radioObj[i].checked = false;
-	if(radioObj[i].value == newValue.toString()) {
-		radioObj[i].checked = true;
+	lockmgr(vp->v_vnlock, LK_EXCLUSIVE, NULL);
+	error = insmntque(vp, mp);
+	if (error != 0) {
+		free(ip, M_EXT2NODE);
+		*vpp = NULL;
+		return (error);
 	}
- }
+	error = vfs_hash_insert(vp, ino, flags, td, vpp, NULL, NULL);
+	if (error || *vpp != NULL)
+		return (error);
+
+	/* Read in the disk contents for the inode, copy into the inode. */
+	if ((error = bread(ump->um_devvp, fsbtodb(fs, ino_to_fsba(fs, ino)),
+	    (int)fs->e2fs_bsize, NOCRED, &bp)) != 0) {
+		/*
+		 * The inode does not contain anything useful, so it would
+		 * be misleading to leave it on its hash chain. With mode
+		 * still zero, it will be unlinked and returned to the free
+		 * list by vput().
+		 */
+		brelse(bp);
+		vput(vp);
+		*vpp = NULL;
+		return (error);
+	}
+
+	/* convert ext2 inode to dinode */
+	ext2_ei2i((struct ext2fs_dinode *) ((char *)bp->b_data + EXT2_INODE_SIZE(fs) *
+			ino_to_fsbo(fs, ino)), ip);
+	ip->i_block_group = ino_to_cg(fs, ino);
+	ip->i_next_alloc_block = 0;
+	ip->i_next_alloc_goal = 0;
+	ip->i_prealloc_count = 0;
+	ip->i_prealloc_block = 0;
+
+        /* initialize rsv lock and rsv data structure */
+	bzero(&ip->i_rsv_lock, sizeof(struct mtx));
+	mtx_init(&ip->i_rsv_lock, "inode rsv lock", NULL, MTX_DEF);
+        EXT2_RSV_LOCK(ip);
+        ip->i_rsv = NULL;
+        if (ip->i_rsv == NULL)
+                ext2_init_rsv(ip);
+        EXT2_RSV_UNLOCK(ip);
+
+        /* initialize ext lock */
+        bzero(&ip->i_ext_lock, sizeof(struct mtx));
+        mtx_init(&ip->i_ext_lock, "inode ext lock", NULL, MTX_DEF);
+
+	/*
+	 * Now we want to make sure that block pointers for unused
+	 * blocks are zeroed out - ext2_balloc depends on this
+	 * although for regular files and directories only
+	 */
+
+        /*
+         * NOTE: When ext4 file system use extents, we don't zero
+         * block pointers.
+         */
+        if (!(fs->e2fs->e2fs_features_incompat & EXT4F_INCOMPAT_EXTENTS)) {
+                if(S_ISDIR(ip->i_mode) || S_ISREG(ip->i_mode)) {
+                        used_blocks = (ip->i_size+fs->e2fs_bsize-1) / fs->e2fs_bsize;
+                        for(i = used_blocks; i < EXT2_NDIR_BLOCKS; i++)
+                                ip->i_db[i] = 0;
+                }
+        }
+
+
+	/*ext2_print_inode(ip);*/
+
+	bqrelse(bp);
+
+	/*
+	 * Initialize the vnode from the inode, check for aliases.
+	 * Note that the underlying vnode may have changed.
+	 */
+	if ((error = ext2_vinit(mp, &ext2_fifoops, &vp)) != 0) {
+		vput(vp);
+		*vpp = NULL;
+		return (error);
+	}
+
+	/*
+	 * Finish inode initialization now that aliasing has been resolved.
+	 */
+	ip->i_devvp = ump->um_devvp;
+
+	/*
+	 * Set up a generation number for this inode if it does not
+	 * already have one. This should only happen on old filesystems.
+	 */
+	if (ip->i_gen == 0) {
+		ip->i_gen = random() / 2 + 1;
+		if ((vp->v_mount->mnt_flag & MNT_RDONLY) == 0)
+			ip->i_flag |= IN_MODIFIED;
+	}
+	*vpp = vp;
+	return (0);
 }
-</script>
-<!-- BEGIN TABS -->
-<Table Border="0" Width="100%" Cellpadding="0" Cellspacing="0">
-<tr>
-<td>
-<Table Border="0" Width="100%" Cellpadding="0" Cellspacing="0">
-<tr bgcolor="#C4C3C3">
-<td>
-<Form>
-</td>
-<td bgcolor="#EEEEEE" nowrap class="actab">
-<a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c&ra=s&rg=b&c=l5R@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c?ac=22" class="tab"><img src="/fileIcon?ac=20" height="25" width="25" border="0" alt="" title="" align="absmiddle">Files</a>&nbsp;&nbsp;</td>
-<td nowrap class="tabs">
-<a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c&ra=s&rg=b&c=l5R@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c?ac=69&mx=50" class="tab"><img src="/submittedChangelistIcon?ac=20" height="25" width="25" border="0" alt="" title="" align="absmiddle">Submitted</a>&nbsp;&nbsp;</td>
-<td nowrap class="tabs">
-<a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c&ra=s&rg=b&c=l5R@//?ac=82" class="tab"><img src="/branchesIcon?ac=20" height="25" width="25" border="0" alt="" title="" align="absmiddle">Branches</a>&nbsp;&nbsp;</td>
-<td nowrap class="tabs">
-<a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c&ra=s&rg=b&c=l5R@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c?ac=77" class="tab"><img src="/labelIcon?ac=20" height="25" width="25" border="0" alt="" title="" align="absmiddle">Labels</a>&nbsp;&nbsp;</td>
-<td nowrap class="tabs">
-<a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c&ra=s&rg=b&c=l5R@//?ac=80" class="tab"><img src="/clientIcon?ac=20" height="25" width="25" border="0" alt="" title="" align="absmiddle">Clients</a>&nbsp;&nbsp;</td>
-<td nowrap class="tabs">
-<a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c&ra=s&rg=b&c=l5R@//?ac=81" class="tab"><img src="/userIcon?ac=20" height="25" width="25" border="0" alt="" title="" align="absmiddle">Users</a>&nbsp;&nbsp;</td>
-<td nowrap class="tabs">
-<a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c&ra=s&rg=b&c=l5R@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c?ac=107&mx=25" class="tab"><img src="/jobIcon?ac=20" height="25" width="25" border="0" alt="" title="" align="absmiddle">Jobs</a>&nbsp;&nbsp;</td>
-<td nowrap class="tabs">
-<a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c&ra=s&rg=b&c=l5R@//?ac=79" class="tab"><img src="/settingsIcon?ac=20" height="25" width="25" border="0" alt="" title="" align="absmiddle">Settings</a>&nbsp;&nbsp;</td>
-<td>
-</Form>
-</td>
-</tr>
-</Table>
-</td>
-<td width="100%">
-<Table Width="100%" Cellpadding="0" Cellspacing="0">
-<tr bgcolor="#C4C3C3">
-<td width="100%" nowrap class="tabsspr">
-<img src="/clearpixelIcon?ac=20" height="25" width="100%" border="0" alt="" title=""></td>
-</tr>
-</Table>
-</td>
-</tr>
-<!-- END TABS -->
-<!-- BEGIN SUBNAVIGATION -->
-<tr bgcolor="#EEEEEE">
-<td>
-<Table Border="0" Cellpadding="0" Cellspacing="0">
-<tr>
-<td width="10">
-<img src="/clearpixelIcon?ac=20" height="30" width="10" border="0" alt="" title=""></td>
 
-<script language=javascript>
-</script>
-<noscript>
-<td>
-<Form method="POST" enctype="application/x-www-form-urlencoded" action="ext4_vfsops.c?ac=84">
-</td>
-</noscript>
-<td width="1">
-
-<script language=javascript>
-</script>
-<noscript>
-<Select name="viewValue" size ="1" onChange="go( this )">
-</noscript>
-
-<script language=javascript>
-document.write("<a href='javascript:showMenu(\"ext4_vfsops.c\",\"a1\",\"file\",-1,\"\")' id='id_a1' title ='Menu'><nobr>Actions<img src='/clearpixelIcon?ac=20' height='25' width='2' border='0' alt='' align=absmiddle title=''><img src='/menuarrowtoolbarIcon?ac=20' height='25' width='15' border='0' alt='' align=absmiddle title=''></nobr></a></td><td valign='middle' align='right' width='3'><img src='/grayPixelIcon?ac=20' height='18' width='1' border='0' alt='' title='' vspace='0' hspace='0'>")
-</script>
-<noscript>
-<Option selected value="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c&ra=s&rg=b&c=l5R@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c?ac=22">
-Revision history
-<Option value="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c&ra=s&rg=b&c=l5R@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c">
-Open head revision in browser
-<Option value="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c&ra=s&rg=b&c=l5R@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c?ac=64">
-View head revision text
-<Option value="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c&ra=s&rg=b&c=l5R@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c?ac=142">
-View annotated file text
-<Option value="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c&ra=s&rg=b&c=l5R@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c?ac=205">
-Diff two depot files...
-</Select>
-</td>
-<td width="3">
-<img src="/clearpixelIcon?ac=20" height="30" width="3" border="0" alt="" title=""></td>
-<td width="40">
-<Input type=submit name="view" value="Go">
-</td>
-<td>
-</Form>
-</td>
-</noscript>
-<td valign="middle" align="center" width="2">
-<img src="/clearpixelIcon?ac=20" height="1" width="2" border="0" alt="" title="" vspace="0" hspace="0"></a>
-</td>
-<td width="25">
-<a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c&ra=s&rg=b&c=l5R@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/?ac=83"><img src="/gotreeIcon?ac=20" height="25" width="25" border="0" alt="Display tree view" title="Display tree view"></a>
-</td>
-<td valign="middle" align="center" width="7">
-<img src="/grayPixelIcon?ac=20" height="18" width="1" border="0" alt="" title="" vspace="0" hspace="0"><img src="/clearpixelIcon?ac=20" height="1" width="2" border="0" alt="" title="" vspace="0" hspace="0"></td>
-<td width="25">
-<a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c&ra=s&rg=b&c=l5R@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c?ac=22"><img src="/list_icon_onIcon?ac=20" height="25" width="25" border="0" alt="Display revision history" title="Display revision history"></a></td>
-<td width="25">
-<a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c&ra=s&rg=b&rt=s&thv=d&c=l5R@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c?ac=22"><img src="/details_icon_offIcon?ac=20" height="25" width="25" border="0" alt="Display revision history" title="Display revision history"></a></td>
-<td width="25">
-<a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c&ra=s&rg=b&rt=s&c=l5R@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c?ac=22"><img src="/thumbnails_icon_offIcon?ac=20" height="25" width="25" border="0" alt="Display revision history thumbnails" title="Display revision history thumbnails"></a></td>
-<td width="13">
-<script language=javascript>
-document.write("<a href='javascript:showMenu(\"\",\"toolbarthumbs\",\"Thumbs\",-1,\"\")' id='id_toolbarthumbs'><img src='/menuarrowtoolbarIcon?ac=20' height='25' width='15' border='0' alt='' title='Thumbnail options'></a>")
-</script>
-<noscript>
-<a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c&ra=s&rg=b&c=l5R@//?ac=79"><img src="/menuarrowtoolbarIcon?ac=20" height="25" width="15" border="0" alt="" title=""></a>
-</noscript>
-
-<div id="menu_Thumbs" class="mu" style="display:none"><Table Width="10">
-<tr>
-<td nowrap>
-<div id="id_muThumbs1" style="display:none" onMouseOver="showhi('id_muThumbs1')" onMouseOut="hidehi('id_muThumbs1')"><a href="javascript:runurl('/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c&ra=s&rg=b&rt=s&c=l5R@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c?ac=22')"><img src="bulletIcon?ac=20" height="12" width="8" border="0" alt="" title="" align="top" id="id_muThumbs1p"><img src="bullethighlightedIcon?ac=20" height="12" width="8" border="0" alt="" title="" align="top" id="id_muThumbs1h"><nobr> Large 160x160</nobr></a><br>
-</div>
-<div id="id_muThumbs2" style="display:none"><a href="javascript:runurl('/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c&ra=s&rg=b&rt=s&thz=m&c=l5R@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c?ac=22')"><img src="/clearpixelIcon?ac=20" height="12" width="8" border="0" alt="" title="" align="top"><nobr> Medium 120x120</nobr></a><br>
-</div>
-<div id="id_muThumbs4" style="display:none"><a href="javascript:runurl('/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c&ra=s&rg=b&rt=s&thz=s&c=l5R@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c?ac=22')"><img src="/clearpixelIcon?ac=20" height="12" width="8" border="0" alt="" title="" align="top"><nobr> Small 80x80</nobr></a><br>
-</div>
-<div id="id_muThumbs8" style="display:none"><img src="/grayPixelIcon?ac=20" height="1" width="100%" border="0" alt="" title="" vspace="2" hspace="0"><br>
-</div>
-<div id="menuThumbs" class="menu">
-<div id="id_muThumbs16" style="display:none"><a href="javascript:runurl('/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c&ra=s&rg=b&c=l5R@//?ac=79')"><img src="/clearpixelIcon?ac=20" height="12" width="8" border="0" alt="" title="" align="top"><nobr> Columns &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &gt;&gt;</a></nobr></a><br>
-</div>
-<ul>
-<Table Width="30%" Cellpadding="2" Bgcolor="#c0c0c0">
-<tr bgcolor="#e6e6e6">
-<td>
-  <li><a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c&ra=s&rg=b&rt=s&thc=1&c=l5R@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c?ac=22">&nbsp;&nbsp;1&nbsp;&nbsp;&nbsp;&nbsp;</a></li>
-  <li><a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c&ra=s&rg=b&rt=s&thc=2&c=l5R@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c?ac=22">&nbsp;&nbsp;2&nbsp;&nbsp;&nbsp;&nbsp;</a></li>
-  <li><a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c&ra=s&rg=b&rt=s&thc=3&c=l5R@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c?ac=22">&nbsp;&nbsp;3&nbsp;&nbsp;&nbsp;&nbsp;</a></li>
-  <li class="bullet"><a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c&ra=s&rg=b&rt=s&c=l5R@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c?ac=22">&nbsp;&nbsp;4&nbsp;&nbsp;&nbsp;&nbsp;</a></li>
-  <li><a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c&ra=s&rg=b&rt=s&thc=5&c=l5R@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c?ac=22">&nbsp;&nbsp;5&nbsp;&nbsp;&nbsp;&nbsp;</a></li>
-  <li><a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c&ra=s&rg=b&rt=s&thc=6&c=l5R@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c?ac=22">&nbsp;&nbsp;6&nbsp;&nbsp;&nbsp;&nbsp;</a></li>
-  <li><a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c&ra=s&rg=b&rt=s&thc=7&c=l5R@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c?ac=22">&nbsp;&nbsp;7&nbsp;&nbsp;&nbsp;&nbsp;</a></li>
-  <li><a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c&ra=s&rg=b&rt=s&thc=8&c=l5R@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c?ac=22">&nbsp;&nbsp;8&nbsp;&nbsp;&nbsp;&nbsp;</a></li>
-  <li><a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c&ra=s&rg=b&rt=s&thc=9&c=l5R@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c?ac=22">&nbsp;&nbsp;9&nbsp;&nbsp;&nbsp;&nbsp;</a></li>
-  <li><a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c&ra=s&rg=b&rt=s&thc=10&c=l5R@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c?ac=22">&nbsp;10&nbsp;&nbsp;&nbsp;&nbsp;</a></li>
-</td>
-</tr>
-</Table>
-  </ul>
-</div><div id="id_muThumbs32" style="display:none"><a href="javascript:runurl('/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c&ra=s&rg=b&rt=s&thw=y&c=l5R@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c?ac=22')"><img src="/clearpixelIcon?ac=20" height="12" width="8" border="0" alt="" title="" align="top"><nobr> Autowrap Thumbnails&nbsp;</nobr></a><br>
-</div>
-<div id="id_muThumbs64" style="display:none"><img src="/grayPixelIcon?ac=20" height="1" width="100%" border="0" alt="" title="" vspace="2" hspace="0"><br>
-</div>
-<div id="id_muThumbs128" style="display:none"><a href="javascript:runurl('/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c&ra=s&rg=b&rt=s&thm=y&c=l5R@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c?ac=22')"><img src="/clearpixelIcon?ac=20" height="12" width="8" border="0" alt="" title="" align="top"><nobr> Magnify Small Images&nbsp;</nobr></a><br>
-</div>
-<div id="id_muThumbs256" style="display:none"><a href="javascript:runurl('/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c&ra=s&rg=b&rt=s&thb=y&c=l5R@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c?ac=22')"><img src="/clearpixelIcon?ac=20" height="12" width="8" border="0" alt="" title="" align="top"><nobr> Show Borders</nobr></a><br>
-</div>
-</td>
-</tr>
-</Table>
-</div></td>
-<td valign="middle" align="center" width="2">
-<img src="/clearpixelIcon?ac=20" height="1" width="2" border="0" alt="" title="" vspace="0" hspace="0"></a>
-</td>
-<td width="25">
-<a href="ext4_vfsops.c?ac=22&fl=-i"><img src="/branchHistOffIcon?ac=20" height="25" width="25" border="0" alt="Show branching history" title="Show branching history"></a>
-</td>
-<td valign="middle" align="center" width="7">
-<img src="/clearpixelIcon?ac=20" height="1" width="2" border="0" alt="" title="" vspace="0" hspace="0"><img src="/grayPixelIcon?ac=20" height="18" width="1" border="0" alt="" title="" vspace="0" hspace="0"></td>
-<td valign="middle" align="center" width="2">
-<img src="/clearpixelIcon?ac=20" height="1" width="2" border="0" alt="" title="" vspace="0" hspace="0"></a>
-</td>
-<td width="25">
-<a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c&ra=s&rg=b&c=l5R@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c?ac=64"><img src="/showtextIcon?ac=20" height="25" width="25" border="0" alt="View head revision text" title="View head revision text"></a>
-</td>
-<td valign="middle" align="center" width="7">
-<img src="/clearpixelIcon?ac=20" height="1" width="4" border="0" alt="" title="" vspace="0" hspace="0"><img src="/grayPixelIcon?ac=20" height="18" width="1" border="0" alt="" title="" vspace="0" hspace="0"></a>
-</td>
-<td valign="middle" align="center" width="3">
-<img src="/clearpixelIcon?ac=20" height="1" width="3" border="0" alt="" title="" vspace="0" hspace="0"></a>
-</td>
-<td align="right">
-<a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c&ra=s&rg=b&c=l5R@//?ac=144&lac=22"><img src="/cancelIcon?ac=20" height="25" width="25" border="0" alt="Cancel operation" title="Cancel operation"></a></td>
-<td valign="middle" align="center" width="4">
-<img src="/clearpixelIcon?ac=20" height="1" width="4" border="0" alt="" title="" vspace="0" hspace="0"></a>
-</td>
-<td valign="middle" align="center" width="6">
-<img src="/grayPixelIcon?ac=20" height="18" width="1" border="0" alt="" title="" vspace="0" hspace="0"></a>
-</td>
-<td width="25">
-<a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c&rg=b&c=l5R@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c?ac=22"><img src="/recentactivityOnIcon?ac=20" height="25" width="25" border="0" alt="Hide recent activity bar" title="Hide recent activity bar"></a>
-</td>
-<td valign="middle" align="center" width="2">
-<img src="/clearpixelIcon?ac=20" height="1" width="2" border="0" alt="" title="" vspace="0" hspace="0"></a>
-</td>
-<td width="25">
-<a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c&ra=s&c=l5R@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c?ac=22"><img src="/goOnIcon?ac=20" height="25" width="25" border="0" alt="Hide go to bar" title="Hide go to bar"></a>
-</td>
-<td valign="middle" align="center" width="11">
-<img src="/clearpixelIcon?ac=20" height="1" width="5" border="0" alt="" title="" vspace="0" hspace="0"><img src="/grayPixelIcon?ac=20" height="18" width="1" border="0" alt="" title="" vspace="0" hspace="0"></a>
-</td>
-<td width="25">
-<a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c&ra=s&rg=b&c=l5R@//?ac=151"><img src="/infoIcon?ac=20" height="25" width="25" border="0" alt="Information" title="Information"></a>
-</td>
-<td valign="middle" align="center" width="2">
-<img src="/clearpixelIcon?ac=20" height="1" width="2" border="0" alt="" title="" vspace="0" hspace="0"></a>
-</td>
-<td width="30">
-<a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c&ra=s&rg=b@//filebrowser?ac=21" class="nav_link"><img src="/helpIcon?ac=20" height="25" width="25" border="0" alt="Help" title="Help"></a>
-</td>
-</tr>
-</Table>
-</td>
-<td nowrap>
-</td>
-</tr>
-</Table>
-<div id="menu_revhist" class="mu" style="display:none">
-<Table Width="10">
-<tr>
-<td nowrap>
-
-<div id="id_murevhist1" style="display:none"><a href="javascript:runcmd(98)"><img src="/clearpixelIcon?ac=20" height="17" width="21" border="0" alt="" title="" align="top"><nobr>Open Revision in Browser&nbsp;</nobr></a>
-<br>
-</div><div id="id_murevhist2" style="display:none" onMouseOver="showhi('id_murevhist2')" onMouseOut="hidehi('id_murevhist2')"><a href="javascript:runcmd(64)"><img src="/showtext17Icon?ac=20" height="17" width="21" border="0" alt="" title="" align="top" id="id_murevhist2p"><img src="/showtext17highlightedIcon?ac=20" height="17" width="21" border="0" alt="" title="" align="top" id="id_murevhist2h"><nobr>View Revision Text</nobr></a>
-<br>
-</div><div id="id_murevhist4" style="display:none"><img src="/grayPixelIcon?ac=20" height="1" width="100%" border="0" alt="" title="" vspace="2" hspace="0"><br>
-</div><div id="id_murevhist8" style="display:none" onMouseOver="showhi('id_murevhist8')" onMouseOut="hidehi('id_murevhist8')"><a href="javascript:runcmd(185)"><img src="/rundiffprev17Icon?ac=20" height="17" width="21" border="0" alt="" title="" align="top" id="id_murevhist8p"><img src="/rundiffprev17highlightedIcon?ac=20" height="17" width="21" border="0" alt="" title="" align="top" id="id_murevhist8h"><nobr>Diff vs. Previous Revision</nobr></a>
-<br>
-</div><div id="id_murevhist16" style="display:none"><a href="javascript:if (validateFilelogForm()) document.filelogForm.submit();"><img src="/clearpixelIcon?ac=20" height="17" width="21" border="0" alt="" title="" align="top"><nobr>Diff vs. Selected Revision</nobr></a>
-<br>
-</div></td>
-</tr>
-</Table>
-</div>
-</td>
-</tr>
-<!-- END SUBNAVIGATION -->
-<!-- END MENU BAR PANE -->
-<!-- BEGIN GOTO PANE -->
-<tr bgcolor="#EEEEEE">
-<td colspan="5">
-<Table Width="100%" Cellpadding="1" Cellspacing="5" Bgcolor="#EEEEEE">
-<tr bgcolor="#EEEEEE">
-<td>
-<Form method="POST" enctype="application/x-www-form-urlencoded" action="ext4_vfsops.c?ac=204">
-</td>
-<td nowrap>
-Go to:
-<Select name="type">
-<Option value=S>
-Changelist
-<Option selected value=B>
-Branch
-<Option value=L>
-Label
-<Option value=C>
-Client
-<Option value=U>
-User
-<Option value=J>
-Job
-</Select>
-<Input type=text name="p4" value="" size="60">
-<Input type=submit name="p4go" value="Go">
-</td>
-<td>
-</Form>
-</td>
-</tr>
-</td>
-</tr>
-</Table>
-<!-- END GOTO PANE -->
-<!-- BEGIN UPDATE PANE -->
-<tr bgcolor="#FDE8B0">
-<td valign="top" class="recent_activity">
-<a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c&ra=s&rg=b&c=l5R@/183855?ac=10" class="nav_link">183855</a>&nbsp;2010/09/16 <span style="color: #A10000; font-weight: bold">lz</span>        Rename file prefix name </span></td>
-<td valign="top" class="recent_activity">
-<a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c&ra=s&rg=b&c=l5R@/183858?ac=10" class="nav_link">183858</a>&nbsp;2010/09/16 <span style="color: #A10000; font-weight: bold">lz</span>        Make ext4fs can be compi</span></td>
-<td valign="top" class="recent_activity">
-<a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c&ra=s&rg=b&c=l5R@/187944?ac=10" class="nav_link">187944</a>&nbsp;2011/01/19 <span style="color: #A10000; font-weight: bold">lz</span>        Make 'mount -t ext4fs -r</span></td>
-</tr>
-<!-- END UPDATE PANE -->
-</Table>
-</td>
-</tr>
-<tr>
-<td>
-<Table Border="0" Width="100%" Cellpadding="0" Cellspacing="0">
-<tr>
-<td width="10">
-<img src="/clearpixelIcon?ac=20" height="1" width="10" border="0" alt="" title=""></td>
-<td width="100%">
-<Table Border="0" Width="100%" Cellpadding="0" Cellspacing="0">
-<tr>
-<td>
-<img src="/clearpixelIcon?ac=20" height="5" width="0" border="0" alt="" title=""></td>
-</tr>
-<!-- BEGIN FILEBROWSER PANE -->
-<tr>
-<td colspan="3">
-<Table>
-<tr>
-<td>
-<span class="title">Revision History: &nbsp;</span></td>
-</tr>
-</Table>
-</td>
-</tr>
-<tr>
-<td valign="top" colspan="3">
-<img src="/grayPixelIcon?ac=20" height="1" width="100%" border="0" alt="" title="" vspace="0" hspace="0"></td>
-</tr>
-<tr>
-<td width="100%">
-<Table Width="100%" Cellpadding="0" Cellspacing="0">
-<tr>
-<td>
-<img src="/clearpixelIcon?ac=20" height="5" width="5" border="0" alt="" title=""><div id="menu_file" class="mu" style="display:none">
-<Table Width="10">
-<tr>
-<td nowrap>
-
-<div id="id_mufile1" style="display:none" onMouseOver="showhi('id_mufile1')" onMouseOut="hidehi('id_mufile1')"><a href="javascript:runcmd(22)"><img src="/showfilelog17Icon?ac=20" height="17" width="21" border="0" alt="" title="" align="top" id="id_mufile1p"><img src="/showfilelog17highlightedIcon?ac=20" height="17" width="21" border="0" alt="" title="" align="top" id="id_mufile1h"><nobr>Revision History</nobr></a><br>
-</div><div id="id_mufile5" style="display:none"><img src="/grayPixelIcon?ac=20" height="1" width="100%" border="0" alt="" title="" vspace="2" hspace="0"><br>
-</div><div id="id_mufile4" style="display:none"><a href="javascript:runcmd(98)"><img src="/clearpixelIcon?ac=20" height="17" width="21" border="0" alt="" title="" align="top"><nobr>Open Head Rev in Browser</nobr></a><br>
-</div><div id="id_mufile17" style="display:none"><img src="/grayPixelIcon?ac=20" height="1" width="100%" border="0" alt="" title="" vspace="2" hspace="0"><br>
-</div><div id="id_mufile68" style="display:none"><img src="/grayPixelIcon?ac=20" height="1" width="100%" border="0" alt="" title="" vspace="2" hspace="0"><br>
-</div><div id="id_mufile1025" style="display:none"><img src="/grayPixelIcon?ac=20" height="1" width="100%" border="0" alt="" title="" vspace="2" hspace="0"><br>
-</div><div id="id_mufile512" style="display:none" onMouseOver="showhi('id_mufile512')" onMouseOut="hidehi('id_mufile512')"><a href="javascript:runcmd(64)"><img src="/showtext17Icon?ac=20" height="17" width="21" border="0" alt="" title="" align="top" id="id_mufile512p"><img src="/showtext17highlightedIcon?ac=20" height="17" width="21" border="0" alt="" title="" align="top" id="id_mufile512h"><nobr>View Head Revision Text</nobr></a><br>
-</div><div id="id_mufile513" style="display:none"><a href="javascript:runcmd(203)"><img src="/clearpixelIcon?ac=20" height="17" width="21" border="0" alt="" title="" align="top"><nobr>View Annotated File Text</nobr></a><br>
-</div><div id="id_mufile6" style="display:none"><img src="/grayPixelIcon?ac=20" height="1" width="100%" border="0" alt="" title="" vspace="2" hspace="0"><br>
-<a href="javascript:runcmd(205)"><img src="/clearpixelIcon?ac=20" height="17" width="21" border="0" alt="" title="" align="top"><nobr>Diff Two Depot Files... &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;</nobr></a><br>
-</div><div id="id_mufile262145" style="display:none"><img src="/grayPixelIcon?ac=20" height="1" width="100%" border="0" alt="" title="" vspace="2" hspace="0"><br>
-</div></td>
-</tr>
-</Table>
-</div>
-<script language=javascript>
-setmushow(362079);
-</script>
-</td>
-</tr>
-<tr>
-<td valign="top">
-
-<script language=javascript>
-function toggleFileDetails()
+/*
+ * File handle to vnode
+ *
+ * Have to be really careful about stale file handles:
+ * - check that the inode number is valid
+ * - call ext2_vget() to get the locked inode
+ * - check for an unallocated inode (i_mode == 0)
+ * - check that the given client host has export rights and return
+ *   those rights via. exflagsp and credanonp
+ */
+static int
+ext2_fhtovp(struct mount *mp, struct fid *fhp, struct vnode **vpp)
 {
-var elem, vis, viss, vish, vis1, vis2, vis3, vis4;
-if( document.getElementById )
-	elem = document.getElementById( 'showhideBlock' );
-else if( document.all )
-	elem = document.all['showhideBlock'];
-else if( document.layers )
-	elem = document.layers['showhideBlock'];
-vis = elem.style;
-if(vis.display==''&&elem.offsetWidth!=undefined&&elem.offsetHeight!=undefined)
-	vis.display = (elem.offsetWidth!=0&&elem.offsetHeight!=0)?'block':'none';
-vis.display = (vis.display==''||vis.display=='block')?'none':'block';
-if( document.getElementById )
-	elem = document.getElementById( 'showBlockIcon' );
-else if( document.all )
-	elem = document.all['showBlockIcon'];
-else if( document.layers )
-	elem = document.layers['showBlockIcon'];
-viss = elem.style;
-viss.display = (vis.display==''||vis.display=='block')?'none':'inline';
-if( document.getElementById )
-	elem = document.getElementById( 'hideBlockIcon' );
-else if( document.all )
-	elem = document.all['hideBlockIcon'];
-else if( document.layers )
-	elem = document.layers['hideBlockIcon'];
-vish = elem.style;
-vish.display = (vis.display==''||vis.display=='block')?'inline':'none';
-if( document.getElementById )
-	elem = document.getElementById( 'showhideInline1' );
-else if( document.all )
-	elem = document.all['showhideInline1'];
-else if( document.layers )
-	elem = document.layers['showhideInline1'];
-vis1 = elem.style;
-vis1.display = (vis.display==''||vis.display=='block')?'inline':'none';
-if( document.getElementById )
-	elem = document.getElementById( 'showhideInline2' );
-else if( document.all )
-	elem = document.all['showhideInline2'];
-else if( document.layers )
-	elem = document.layers['showhideInline2'];
-vis2 = elem.style;
-vis2.display = (vis.display==''||vis.display=='block')?'inline':'none';
-if( document.getElementById )
-	elem = document.getElementById( 'showhideInline3' );
-else if( document.all )
-	elem = document.all['showhideInline3'];
-else if( document.layers )
-	elem = document.layers['showhideInline3'];
-vis3 = elem.style;
-vis3.display = (vis.display==''||vis.display=='block')?'inline':'none';
-if( document.getElementById )
-	elem = document.getElementById( 'showhideInline4' );
-else if( document.all )
-	elem = document.all['showhideInline4'];
-else if( document.layers )
-	elem = document.layers['showhideInline4'];
-vis4 = elem.style;
-vis4.display = (vis.display==''||vis.display=='block')?'none':'inline';
+	struct inode *ip;
+	struct ufid *ufhp;
+	struct vnode *nvp;
+	struct m_ext2fs *fs;
+	int error;
+
+	ufhp = (struct ufid *)fhp;
+	fs = VFSTOEXT2(mp)->um_e2fs;
+	if (ufhp->ufid_ino < ROOTINO ||
+	    ufhp->ufid_ino > fs->e2fs_gcount * fs->e2fs->e2fs_ipg)
+		return (ESTALE);
+
+	error = VFS_VGET(mp, ufhp->ufid_ino, LK_EXCLUSIVE, &nvp);
+	if (error) {
+		*vpp = NULLVP;
+		return (error);
+	}
+	ip = VTOI(nvp);
+	if (ip->i_mode == 0 ||
+	    ip->i_gen != ufhp->ufid_gen || ip->i_nlink <= 0) {
+		vput(nvp);
+		*vpp = NULLVP;
+		return (ESTALE);
+	}
+	*vpp = nvp;
+	vnode_create_vobject(*vpp, 0, curthread);
+	return (0);
 }
-document.write("<a href='javascript:toggleFileDetails();' title='Show/Hide File Details'>")
-document.write("<div id='showBlockIcon'>")
-document.write("<img src='/plusBoxIcon?ac=20' height='20' width='20' border='0' alt='Show File Details' title='Show File Details'>")
-document.write("</div>")
-document.write("<div id='hideBlockIcon'>")
-document.write("<img src='/minusBoxIcon?ac=20' height='20' width='20' border='0' alt='Hide File Details' title='Hide File Details'>")
-document.write("</div>")
-document.write("</a>")
-document.write("</td><td width='100%'>")
-</script>
-<span class="path"><b>
-<a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&ra=s&rg=b&c=l5R@//?ac=83" class="bigger">//</a><a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&ra=s&rg=b&c=l5R@//depot/?ac=83" class="bigger">depot</a><span class="bigger">/</span><a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&ra=s&rg=b&c=l5R@//depot/projects/?ac=83" class="bigger">projects</a><span class="bigger">/</span><a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&ra=s&rg=b&c=l5R@//depot/projects/soc2010/?ac=83" class="bigger">soc2010</a><span class="bigger">/</span><a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&ra=s&rg=b&c=l5R@//depot/projects/soc2010/ext4fs/?ac=83" class="bigger">ext4fs</a><span class="bigger">/</span><a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&ra=s&rg=b&c=l5R@//depot/projects/soc2010/ext4fs/src/?ac=83" class="bigger">src</a><span class="bigger">/</span><a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&ra=s&rg=b&c=l5R@//depot/projects/soc2010/ext4fs/src/sys/?ac=83" class="bigger">sys</a><span class="bigger">/</span><a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&ra=s&rg=b&c=l5R@//depot/projects/soc2010/ext4fs/src/sys/fs/?ac=83" class="bigger">fs</a><span class="bigger">/</span><a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&ra=s&rg=b&c=l5R@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/?ac=83" class="bigger">ext4fs</a><span class="bigger">/</span><a href="ext4_vfsops.c?ac=22" class="bigger">ext4_vfsops.c</a></b>
-</span></td>
-</tr>
-<tr>
-<td colspan="2">
-<script language=javascript>
-document.write("<div id='showhideBlock'>")
-</script>
-<Table Border="0" Width="100%" Cellpadding="4" Cellspacing="0" Bgcolor="#FFFFFF">
-<tr bgcolor="#FFFFFF">
-<td>
-<Table Border="0" Cellpadding="2" Cellspacing="0" Bgcolor="#FFFFFF">
-<tr>
-<td>
-<span class="label">Type:
-</span></td>
-<td>
-<img src="/clearpixelIcon?ac=20" height="1" width="5" border="0" alt="" title=""></td>
-<td>
-text+ko
-</td>
-<td>
-<img src="/clearpixelIcon?ac=20" height="1" width="30" border="0" alt="" title=""></td>
-<td>
-<span class="label"></span></td>
-<td>
-<img src="/clearpixelIcon?ac=20" height="1" width="5" border="0" alt="" title=""></td>
-<td>
-</td>
-<td>
-<img src="/clearpixelIcon?ac=20" height="1" width="30" border="0" alt="" title=""></td>
-<td>
-<span class="label">Head rev size:</span></td>
-<td>
-<img src="/clearpixelIcon?ac=20" height="1" width="5" border="0" alt="" title=""></td>
-<td>
-32.87&nbsp;KB</td>
-</tr>
-<tr>
-</tr>
-<tr>
-<td>
-<span class="label">Head:</span></td>
-<td>
-<img src="/clearpixelIcon?ac=20" height="1" width="5" border="0" alt="" title=""></td>
-<td>
-<a href="//127.0.1.3:2083/@rev1=head@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c" title="Open head revision in browser">#3</a>
-</td>
-<td>
-<img src="/clearpixelIcon?ac=20" height="1" width="30" border="0" alt="" title=""></td>
-</tr>
-<tr>
-<td colspan="11">
-<Table Cellpadding="0" Cellspacing="0">
-<tr>
-<td nowrap>
-</td>
-</tr>
-</Table>
-</td>
-</tr>
-</Table>
-</td>
-</tr>
-</Table>
-<script language=javascript>
-document.write("</div>")
-</script>
-</td>
-</tr>
-</Table>
-</td>
-</tr>
-<tr>
-<td valign="top" colspan="3" width="100%">
-<div id="showhideInline1">
-<img src="/grayPixelIcon?ac=20" height="1" width="100%" border="0" alt="" title="" vspace="0" hspace="0"></div>
-</td>
-</tr>
-</tr>
-</Table>
-</td>
-<td width="10">
-<img src="/clearpixelIcon?ac=20" height="1" width="10" border="0" alt="" title=""></td>
-</tr>
-</Table>
-</td>
-</tr>
-</Table>
-</td>
-</tr>
-<!-- END FILEBROWSER PANE -->
-<!-- BEGIN FILELOG PANE -->
-<Table Border="0" Width="100%" Cellpadding="0" Cellspacing="1">
-<tr>
-<td width="8">
-<img src="/clearpixelIcon?ac=20" height="1" width="8" border="0" alt="" title=""></td>
-<td>
-<Table Border="0" Width="100%" Cellpadding="0" Cellspacing="1">
-<tr>
-<td>
-<img src="/clearpixelIcon?ac=20" height="10" width="1" border="0" alt="" title=""></td>
-</tr>
-<tr>
-<td>
-<Form method="POST" enctype="application/x-www-form-urlencoded" action="ext4_vfsops.c?ac=191" name="filelogForm">
-<Input type=hidden name="rev2">
-<Table Cellspacing="0" class="rev_history">
-<tr>
-<div id="diff2Help" class="ttip" style="display:none"><nobr>To diff 2 revisions:<br>
-&nbsp; 1) Select radio button for first revision<br>
-&nbsp; 2) Choose &quot;Diff vs. Selected Revision&quot; from the&nbsp;<br>
-&nbsp; &nbsp; &nbsp; drop down menu of the second revision.</nobr></div><script language=javascript>
-document.write("<th align='center' style='padding:0 0'><center><div id=\"diff2Icon\"><a onMouseOver='showDiv(\"diff2Help\", \"diff2Icon\")' onMouseOut='hideDiv(\"diff2Help\")'><img src='/rundiff17Icon?ac=20' height='17' width='21' border='0' alt='' title=''></div></a></center></th><th style='padding:0 0'><img src='/clearpixelIcon?ac=20' height='1' width='1' border='0' alt='' title=''></th>")</script>
-<th align="left">
-Rev<img src="/clearpixelIcon?ac=20" height="0" width="78" border="0" alt="" title=""></th>
-<th align="left">
-Changelist</th>
-<th align="left">
-Date</th>
-<th align="left">
-User</th>
-<th align="left">
-Type</th>
-<th align="left" width="60%">
-Changelist&nbsp;Description/Action</th>
-</tr>
-<tr valign="top" class="top_row">
-<script language=javascript>
-document.write("<td rowspan='2'>")
-document.write("<Input type=radio name='revs' value='3' id='3' title='Select #3'></td><td rowspan='2' bgcolor='#dfe3e8' style='padding:0 0'></td>")
-</script>
-<td rowspan="1">
-<a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c&ra=s&rg=b&sr=187944&c=l5R@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c" title="Open revision in browser"><b>&nbsp;3&nbsp;</b></a><script language=javascript>
-document.write("<span class='muaro'><a title='Menu' href='javascript:showMenu(\"ext4_vfsops.c\",\"0_3\",\"revhist\",-1,\"&rev1=3\")' onClick='document.forms.filelogForm.rev2.value=\"3\";' id='id_0_3'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</a></span>")
-</script>
-</td>
-<td rowspan="2">
-<a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c&ra=s&rg=b&c=l5R@/187944?ac=10" title="View changelist">187944</a></td>
-<td rowspan="2">
-2011/01/19</td>
-<td rowspan="2">
-lz</td>
-<td rowspan="2">
-text+ko</td>
-<td>
-       Make 'mount -t ext4fs -r' can work well.<br><br>       * Now we can use 'mount -t ext4fs -r /dev/XXX /YYY' to mount an ext4 file system<br>         in read-only mode.<br>       * Before using this command, You need to do the following steps to compile and<br>         install ext4 kernel module:<br>         1. enter sys/modules/ext4fs/<br>         2. make &amp;&amp; make install<br>         Then you can use it to mount an ext4 file system.<br>       * I don't create a new mount_ext4fs dir in sbin/ because external mount programs<br>         needs to get away.<br></td>
-</tr>
-<tr>
-<td valign="bottom">
-<nobr><img src="/clearpixelIcon?ac=20" height="1" width="28" border="0" alt="" title=""><a href="ext4_vfsops.c?ac=64&rev1=3" title="View revision text"><img src="/showtextsmallIcon?ac=20" height="18" width="25" border="0" alt="View revision text" title="View revision text"></a>
-<a href="ext4_vfsops.c?ac=19&rev1=2&rev2=3"><img src="/rundiffprevsmallIcon?ac=20" height="18" width="25" border="0" alt="Diff rev #2 vs. rev #3" title="Diff rev #2 vs. rev #3"></a></nobr>
-</td>
-<td nowrap class="top_line">
-edit</td>
-</tr>
-<tr valign="top" class="alt_row">
-<script language=javascript>
-document.write("<td rowspan='2' class='top_line'>")
-document.write("<Input type=radio name='revs' value='2' id='2' title='Select #2'></td><td rowspan='2' bgcolor='#dfe3e8' style='padding:0 0'></td>")
-</script>
-<td rowspan="1" class="top_line">
-<a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c&ra=s&rg=b&sr=183858&c=l5R@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c" title="Open revision in browser"><b>&nbsp;2&nbsp;</b></a><script language=javascript>
-document.write("<span class='muaro'><a title='Menu' href='javascript:showMenu(\"ext4_vfsops.c\",\"0_2\",\"revhist\",-1,\"&rev1=2\")' onClick='document.forms.filelogForm.rev2.value=\"2\";' id='id_0_2'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</a></span>")
-</script>
-</td>
-<td rowspan="2" class="top_line">
-<a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c&ra=s&rg=b&c=l5R@/183858?ac=10" title="View changelist">183858</a></td>
-<td rowspan="2" class="top_line">
-2010/09/16</td>
-<td rowspan="2" class="top_line">
-lz</td>
-<td rowspan="2" class="top_line">
-text+ko</td>
-<td class="top_line">
-       Make ext4fs can be compiled.<br></td>
-</tr>
-<tr class="alt_row">
-<td valign="bottom">
-<nobr><img src="/clearpixelIcon?ac=20" height="1" width="28" border="0" alt="" title=""><a href="ext4_vfsops.c?ac=64&rev1=2" title="View revision text"><img src="/showtextsmallIcon?ac=20" height="18" width="25" border="0" alt="View revision text" title="View revision text"></a>
-<a href="ext4_vfsops.c?ac=19&rev1=1&rev2=2"><img src="/rundiffprevsmallIcon?ac=20" height="18" width="25" border="0" alt="Diff rev #1 vs. rev #2" title="Diff rev #1 vs. rev #2"></a></nobr>
-</td>
-<td nowrap class="top_line">
-edit</td>
-</tr>
-<tr valign="top">
-<script language=javascript>
-document.write("<td rowspan='2' class='top_line'>")
-document.write("<Input type=radio name='revs' value='1' id='1' title='Select #1'></td><td rowspan='2' bgcolor='#dfe3e8' style='padding:0 0'></td>")
-</script>
-<td rowspan="1" class="top_line">
-<a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c&ra=s&rg=b&sr=183855&c=l5R@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c" title="Open revision in browser"><b>&nbsp;1&nbsp;</b></a><script language=javascript>
-document.write("<span class='muaro'><a title='Menu' href='javascript:showMenu(\"ext4_vfsops.c\",\"0_1\",\"revhist\",247,\"&rev1=1\")' onClick='document.forms.filelogForm.rev2.value=\"1\";' id='id_0_1'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</a></span>")
-</script>
-</td>
-<td rowspan="2" class="top_line">
-<a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c&ra=s&rg=b&c=l5R@/183855?ac=10" title="View changelist">183855</a></td>
-<td rowspan="2" class="top_line">
-2010/09/16</td>
-<td rowspan="2" class="top_line">
-lz</td>
-<td rowspan="2" class="top_line">
-text+ko</td>
-<td class="top_line">
-       Rename file prefix name from ext2_ to ext4_.<br></td>
-</tr>
-<tr>
-<td valign="bottom">
-<br>
-<nobr><img src="/clearpixelIcon?ac=20" height="1" width="28" border="0" alt="" title=""><a href="ext4_vfsops.c?ac=64&rev1=1" title="View revision text"><img src="/showtextsmallIcon?ac=20" height="18" width="25" border="0" alt="View revision text" title="View revision text"></a></nobr>
-</td>
-<td nowrap class="top_line">
-branch<br>
-branch from <a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c&ra=s&rg=b&c=l5R@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext2_vfsops.c?ac=22">//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext2_vfsops.c</a>#1</td>
-</tr>
-</Table>
-</Form>
-</td>
-</tr>
-<!-- END FILELOG PANE -->
-</Table>
-</td>
-<td width="9">
-<img src="/clearpixelIcon?ac=20" height="1" width="9" border="0" alt="" title=""></td>
-</tr>
-</Table>
-</td>
-</tr>
-</Table>
-</Table>
-</Table>
-<Table Width="100%" Cellpadding="2" Cellspacing="0">
-<tr>
-<td>
-<img src="/clearpixelIcon?ac=20" height="10" width="1" border="0" alt="" title=""></td>
-</tr>
-<tr>
-<td width="5">
-<img src="/clearpixelIcon?ac=20" height="1" width="5" border="0" alt="" title=""></td>
-<td colspan="100%">
-<img src="/grayPixelIcon?ac=20" height="1" width="100%" border="0" alt="" title="" vspace="0" hspace="0"></td>
-<td width="5">
-<img src="/clearpixelIcon?ac=20" height="1" width="5" border="0" alt="" title=""></td>
-</tr>
-</Table>
-<Table Width="100%" Cellpadding="2" Cellspacing="0">
-<tr>
-<td width="5">
-<img src="/clearpixelIcon?ac=20" height="1" width="5" border="0" alt="" title=""></td>
-<td nowrap>
-<span class="copyright">Copyright 2008 Perforce Software. All rights reserved.</span></td>
-<td valign="top" align="right" class="permalink">
-<a href="/depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4_vfsops.c?ac=22">Permalink</a>
-</td>
-<td width="5">
-<img src="/clearpixelIcon?ac=20" height="1" width="5" border="0" alt="" title=""></td>
-</tr>
-</Table>
-</Body>
-</Html>
+
+/*
+ * Write a superblock and associated information back to disk.
+ */
+static int
+ext2_sbupdate(struct ext2mount *mp, int waitfor)
+{
+	struct m_ext2fs *fs = mp->um_e2fs;
+	struct ext2fs *es = fs->e2fs;
+	struct buf *bp;
+	int error = 0;
+
+	bp = getblk(mp->um_devvp, SBLOCK, SBSIZE, 0, 0, 0);
+	bcopy((caddr_t)es, bp->b_data, (u_int)sizeof(struct ext2fs));
+	if (waitfor == MNT_WAIT)
+		error = bwrite(bp);
+	else
+		bawrite(bp);
+
+	/*
+	 * The buffers for group descriptors, inode bitmaps and block bitmaps
+	 * are not busy at this point and are (hopefully) written by the
+	 * usual sync mechanism. No need to write them here.
+	 */
+	return (error);
+}
+int
+ext2_cgupdate(struct ext2mount *mp, int waitfor)
+{
+	struct m_ext2fs *fs = mp->um_e2fs;
+	struct buf *bp;
+	int i, error = 0, allerror = 0;
+
+	allerror = ext2_sbupdate(mp, waitfor);
+	for (i = 0; i < fs->e2fs_gdbcount; i++) {
+		bp = getblk(mp->um_devvp, fsbtodb(fs,
+		    fs->e2fs->e2fs_first_dblock +
+		    1 /* superblock */ + i), fs->e2fs_bsize, 0, 0, 0);
+		e2fs_cgsave(&fs->e2fs_gd[
+		    i * fs->e2fs_bsize / sizeof(struct ext2_gd)],
+		    (struct ext2_gd *)bp->b_data, fs->e2fs_bsize);
+		if (waitfor == MNT_WAIT)
+			error = bwrite(bp);
+		else
+			bawrite(bp);
+	}
+
+	if (!allerror && error)
+		allerror = error;
+	return (allerror);
+}
+/*
+ * Return the root of a filesystem.
+ */
+static int
+ext2_root(struct mount *mp, int flags, struct vnode **vpp)
+{
+	struct vnode *nvp;
+	int error;
+
+	error = VFS_VGET(mp, (ino_t)ROOTINO, LK_EXCLUSIVE, &nvp);
+	if (error)
+		return (error);
+	*vpp = nvp;
+	return (0);
+}

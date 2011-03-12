@@ -1,994 +1,420 @@
-<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN"
-"http://www.w3.org/TR/REC-html40/loose.dtd">
-<Html>
-<Head>
-<Title>P4Web.FreeBSD.org - //depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h</Title>
-<script type="text/javascript"><!--
-var finm
-var args
-var mShw = 0
-var m
-function hideMenu() {
-	if (m)
-		m.style.display='none'
-}
-function formFieldClear( field, text )
-{
-	if (field.value == text) {
-		field.value = '';
-		field.style.color = '#000000';
-    }
-}
-function formFieldRestore( field, text )
-{
-	if (field.value == '') {
-		field.value = text;
-		field.style.color = '#A0A0A0';
-    }
-}
-function hideDiv(divname) {
-	d = document.getElementById(divname)
-	if (d)
-		d.style.display='none'
-}
-function showDiv(divname, divloc) {
-	d = document.getElementById(divname)
-	if (!d)
-		return
-	i = document.getElementById(divloc)
-	if (!i)
-		return
-	var t = i.offsetTop
-	var p = i.offsetParent
-	var l = i.offsetLeft
-	var w = i.offsetWidth
-	while (p.tagName != 'BODY') {
-		t = t + p.offsetTop
-		l = l + p.offsetLeft
-		p = p.offsetParent
-	}
-	d.style.top = t + i.offsetHeight + 10
-	d.style.left = l+(w/2)
-	d.style.display=''
-}
-function validateFilelogForm() {
-	var n = document.forms.filelogForm.revs;
-	for(var i=0; i < n.length; i++) {
-        	if (n[i].checked) {
-				if (document.forms.filelogForm.rev2.value == n[i].value) {
-					alert('You attempted to compare a file with itself. Before choosing the "Diff vs. Selected Revision" option, you must select one of the other revisions by clicking its radio button.')
-					return false;
-				}
-				return true;
-			}
-	}
-	alert('Before choosing the "Diff vs. Selected Revision" option, you must select a revision by clicking its radio button.');
-	return false;
-}
-function showMenu(filename, id, menu, show, arg) {
-	if (m)
-		m.style.display='none'
-	m = document.getElementById('menu_'+menu)
-	if (!m)
-		return
-	finm = filename
-	if (mShw && arg == '')
-		args = '&mu='+mShw
-	else
-		args = arg
-	var n
-	var o
-	var i
-	var j = -1
-	while (j < 31) {
-		n = o = 1 << ++j
-		while (1) {
-			i = document.getElementById('id_mu'+menu+o)
-			if (i) {
-				if (show & n)
-				{
-					i.style.display=''
-					h = document.getElementById('id_mu'+menu+o+'h')
-					if (h)
-						h.style.display='none'
-				}
-				else
-				{
-					i.style.display='none'
-				}
-				if (n < 4)
-					break;
-				o++
-			}
-			else
-				break
-		}
-	}
-	i = document.getElementById('id_'+id)
-	var t = i.offsetTop
-	var p = i.offsetParent
-	var l = i.offsetLeft
-	while (p.tagName != 'BODY') {
-		t = t + p.offsetTop
-		l = l + p.offsetLeft
-		p = p.offsetParent
-	}
-	m.style.top = t + i.offsetHeight + 1
-	m.style.left = l - 8
-	m.style.display=''
-}
-function setmushow(show) {
-	mShw = show
-}
-function runcmd(cmd) {
-	var url = finm + "?ac=" + cmd + args;
-	window.location = url;
-}
-function runurl(url) {
-	window.location = url;
-}
-function runuXc(url, cmd) {
-	var newurl = url + finm + cmd;
-	window.location = newurl;
-}
-function promptuXc(str, url, cmd) {
-	var val=prompt(str, '')
-	if (val!=null && val!='')
-	{
-		var newurl = url + val
-		runuXc(newurl, cmd)
-	}
-}
-function showhi(id)
-{
-	document.getElementById(id + 'p').style.display='none'
-	document.getElementById(id + 'h').style.display=''
-}
-function hidehi(id)
-{
-	document.getElementById(id + 'p').style.display=''
-	document.getElementById(id + 'h').style.display='none'
-}
-function check4ESC(e) {
-	if (m) {
-		var kC  = (window.event) ? event.keyCode : e.keyCode;
-		var Esc = (window.event) ? 27 : e.DOM_VK_ESCAPE
-	      	if (kC==Esc) {
-			m.style.display='none'
-			m = 0
-		}
-	}
-        return true;
-}
-document.onkeyup = check4ESC;
-//--></script>
-  <Style type="text/css"><!--
-  A { text-decoration: none }
-  A:link { text-decoration: none; color: #0000CC; font-family: verdana,arial,helvetica,sans-serif; font-size: 12px }
-  A:visited { text-decoration: none; color: #0000CC; font-family: verdana,arial,helvetica,sans-serif; font-size: 12px }
-  A:hover { text-decoration: underline; color: #0000CC; font-family: verdana,arial,helvetica,sans-serif; font-size: 12px }
-  A.status:link { text-decoration: none; color: #FFFFFF; font-family: verdana,arial,helvetica,sans-serif; font-size: 11px }
-  A.status:visited { text-decoration: none; color: #FFFFFF; font-family: verdana,arial,helvetica,sans-serif; font-size: 11px }
-  A.status:hover { text-decoration: underline; color: #FFFFFF font-family: verdana,arial,helvetica,sans-serif; font-size: 11px }
-  A.nav_link:link { text-decoration: none; color: #0000CC; font-family: verdana,arial,helvetica,sans-serif; font-size: 11px }
-  A.nav_link:visited { text-decoration: none; color: #0000CC; font-family: verdana,arial,helvetica,sans-serif; font-size: 11px }
-  A.nav_link:hover { text-decoration: underline; color: #0000CC; font-family: verdana,arial,helvetica,sans-serif; font-size: 11px }
-  A.tab:link { text-decoration: none; color: #000000; font-family: verdana,arial,helvetica,sans-serif; font-size: 11px; font-weight: bold }
-  A.tab:visited { text-decoration: none; color: #000000; font-family: verdana,arial,helvetica,sans-serif; font-size: 11px; font-weight: bold }
-  A.tab:hover { text-decoration: underline; color: #000000; font-family: verdana,arial,helvetica,sans-serif; font-size: 11px; font-weight: bold }
-  A.path:link { text-decoration: none; color: #0000CC; font-family: verdana,arial,helvetica,sans-serif; font-size: 14px; font-weight: bold }
-  A.path:visited { text-decoration: none; color: #0000CC; font-family: verdana,arial,helvetica,sans-serif; font-size: 14px; font-weight: bold }
-  A.path:hover { text-decoration: underline; color: #0000CC; font-family: verdana,arial,helvetica,sans-serif; font-size: 14px; font-weight: bold }
-  A.remote:link { text-decoration: none; color: #0000CC; font-family: verdana,arial,helvetica,sans-serif; font-size: 10px; font-weight: bold }
-  A.remote:visited { text-decoration: none; color: #0000CC; font-family: verdana,arial,helvetica,sans-serif; font-size: 10px; font-weight: bold }
-  A.remote:hover { text-decoration: underline; color: #0000CC; font-family: verdana,arial,helvetica,sans-serif; font-size: 10px; font-weight: bold }
-  A.file:link { text-decoration: none; color: #0000CC; font-family: verdana,arial,helvetica,sans-serif; font-size: 12px; font-weight: bold }
-  A.file:visited { text-decoration: none; color: #0000CC; font-family: verdana,arial,helvetica,sans-serif; font-size: 12px; font-weight: bold }
-  A.file:hover { text-decoration: underline; color: #0000CC; font-family: verdana,arial,helvetica,sans-serif; font-size: 12px; font-weight: bold }
-  A.bigger:link, A.bigger:visited { text-decoration: none color: #0000FF; font-family: verdana,arial,helvetica,sans-serif; font-size: 14px }
-  A.fixed:link { text-decoration: none; color: #0000CC; font-family: monospace,verdana,arial,helvetica,sans-serif; font-size: 12px; font-weight: normal }
-  A.fixed:visited { text-decoration: none; color: #0000CC; font-family: monospace,verdana,arial,helvetica,sans-serif; font-size: 12px; font-weight: normal }
-  A.fixed:hover { text-decoration: underline; color: #0000CC; font-family: monospace,verdana,arial,helvetica,sans-serif; font-size: 12px; font-weight: normal }
-  TD { font-family: verdana,arial,helvetica,sans-serif; font-size: 12px; font-weight: normal; color: #000000 }
-  TH { font-family: verdana,arial,helvetica,sans-serif; font-size: 11px; font-weight: bold; color: #000000 }
-  TD.recent_activity { font-family: verdana,arial,helvetica,sans-serif; font-size: 11px; padding-left: 3px; padding-right: 3px; padding-top: 3px; padding-bottom: 3px }
-  UL.none { list-style-type: none }
-  DT { font-family: verdana,arial,helvetica,sans-serif; font-size: 12px; font-weight: bold; color: #000000 }
-  DD { font-family: verdana,arial,helvetica,sans-serif; font-size: 12px; font-weight: normal; color: #000000 }
-  table.fHeader { border: 0px; width: 100%; background: #115577 url(/headerBkgrndIcon?ac=20) repeat-x top left;}
-  .logo {padding: 4px 15px 7px 7px; width: 114px;}
-  .tabsspr { background: #c4c3c3 url(/tabBackgroundIcon?ac=20) repeat-x top left; border-left: 1px solid #eeeeee; padding: 2px 0px 2px 0px; }
-  .tabs { background: #c4c3c3 url(/tabBackgroundIcon?ac=20) repeat-x top left; border-right: 1px solid #7f7f7f; border-left: 1px solid #eeeeee; padding: 2px 0px 2px 0px; }
-  td.tabs:hover,
-  .actab { background: #eeeeee url(/activeTabBackgroundIcon?ac=20) repeat-x top left; border-right: 1px solid #7f7f7f; border-left: 1px solid #eeeeee; padding: 2px 0px 2px 0px; }
-  .tabs a,
-  .actab a { padding: 1px 10px 1px 2px; }
-  .fSmall { font-family: verdana,arial,helvetica,sans-serif; font-size: 12px }
-  .fSmaller { font-family: verdana,arial,helvetica,sans-serif; font-size: 10px }
-  .fNormal { font-family: verdana,arial,helvetica,sans-serif; font-size: 14px }
-  .doublespace { font-family: verdana,arial,helvetica,sans-serif; font-size: 14px; font-weight: normal; line-height: 180% }
-  .statusLabel { font-family: verdana,arial,helvetica,sans-serif; font-size: 10px; font-weight: bold; color: #FFCC66; padding: 4px 5px 0px 0px;}
-  .statusPath { font-family: verdana,arial,helvetica,sans-serif; font-size: 10px; font-weight: bold; color: #FFCC66; padding: 0px 5px 0px 0px; }
-  .pathField,
-  .connectionField,
-  .status { font-family: verdana,arial,helvetica,sans-serif; font-size: 11px; color: #FFFFFF }
-  .pathField { padding: 0px 0px 5px 0px; white-space: nowrap; }
-  .connectionField { padding: 4px 60px 0px 0px;}
-  .tab { font-family: verdana,arial,helvetica,sans-serif; color: #000000; font-size: 11px; font-weight: bold }
-  .version { font-family: verdana,arial,helvetica,sans-serif; font-size: 10px; color: #999999 }
-  .remote { font-family: verdana,arial,helvetica,sans-serif; font-size: 10px; color: #996d02 }
-  .title { font-family: verdana,arial,helvetica,sans-serif; font-size: 18px; font-weight: bold; color: #000000 }
-  .copyright { font-family: verdana,arial,helvetica,sans-serif; font-size: 11px; font-style: italic; color: #999999 }
-  .path { font-family: verdana,arial,helvetica,sans-serif; font-size: 14px; font-weight: bold; vertical-align: top }
-  .label { font-family: verdana,arial,helvetica,sans-serif; font-size: 12px; font-weight: bold; color: #000000 }
-  .normal { font-family: verdana,arial,helvetica,sans-serif; font-size: 12px; font-weight: normal; color: #000000 }
-  .fixed { font-family: monospace,verdana,arial,helvetica,sans-serif; font-size: 12px; font-weight: normal; color: #000000 }
-  .subtitle { font-family: verdana,arial,helvetica,sans-serif; font-size: 14px; font-weight: bold; color: #000000; text-align: left }
-  .filestat { font-family: verdana,arial,helvetica,sans-serif; font-size: 10px; color: #999999; }
-  .filestat A:link,
-  .filestat A:visited,
-  .filestat A:hover { text-decoration: none; }
-  .pre { text-decoration: none; font-family: monospace; font-size: 12px; font-weight: normal; color: #000000 }
-  .pre A:link { text-decoration: none; font-family: monospace; font-size: 12px; font-weight: normal; color: #000000 }
-  .pre A:visited { text-decoration: none; font-family: monospace; font-size: 12px; font-weight: normal; color: #000000 }
-  .pre A:hover { text-decoration: none; font-family: monospace; font-size: 12px; font-weight: normal; color: #000000 }
-  TR.b td {margin: 0; border-style: solid; border-width: 0px; border-bottom: 1px solid #E8EAEC;}
-  .ttip { border-style: solid; border-color: #000000; border-width: 1px; background-color: #FFFFF0; padding: 5; position: absolute; font-family: arial,sans-serif; font-size: 12px; }
-  .mu { border-style: solid; border-color: #C0C0C0; border-width: 2px; background-color: #E6E6E6; padding: 0; position: absolute; }
-  .mu div:hover { background-color: #008; }
-  .mu div:hover a { text-decoration: none; color: #ffffff }
-  .mu div {padding: 1 0 1 0;}
-  .mu div div {padding: 0;}
-  .muaro { background-image: url(/menuarrowIcon?ac=20); background-repeat: no-repeat; background-position: center left; }
-  .muaro A:hover { background-image: url(/menuarrowhoverIcon?ac=20); background-repeat: no-repeat; background-position: center left; text-decoration: none; }
-  TD.thumbnail_pane { border-style: solid; border-width: 1px; border-color: #7F7F7F }
-  TR.list_row td { padding: 1px 0px; }
-  TR.pathbr_row td { padding: 2px 0px;}
-  div.alt_row,
-  TR.alt_row { background: #f1f5fa;}
-  div.menu { position: relative; cursor: default}
-  div.menu ul { visibility: hidden; position: absolute; top: -20px; left: 90%; margin: 0; padding: 0 }
-  div.menu:hover > ul { visibility: visible}
-  .menu ul li { display: list-item; list-style: url(/notselectedIcon?ac=20) none inside; padding: 0.2em 4 0 4; white-space: nowrap}
-  .menu ul li:hover { background-color: #008}
-  .menu ul li.divider { list-style: none outside; border-color: #7F7F7F; border-width: 1px 0px 0px 0px; border-style: solid; padding: 0 0 0 0; margin: 2px 0 0 0; line-height: 1px; height: 1px; }
-  .menu ul li.checkmark { list-style: url(/checkmarkIcon?ac=20) disc inside; }
-  .menu ul li.checkmark:hover { list-style: url(/checkmarkhighlightedIcon?ac=20) disc inside; }
-  .menu ul li.bullet { list-style: url(/bulletIcon?ac=20) disc inside; }
-  .menu ul li.bullet:hover { list-style: url(/bullethighlightedIcon?ac=20) disc inside; }
-  .menu ul li a:link,
-  .menu ul li a:visited { text-decoration: none; color: #0000CC; }
-  .menu ul li:hover a:link,
-  .menu ul li:hover a:visited { text-decoration: none; color: #ffffff; }
-  table.rev_history { width: 100%; border: 1px solid #7F7F7F; background: #ffffff;}
-  table.rev_history th {padding: 2px 8px; background: #EEEEEE; text-align: left;}
-  table.rev_history td {margin: 0; padding: 3px 8px; vertical-align: top;}
-  table.rev_history td.top_line {margin: 0; border-top: 1px solid #d1d5da; padding: 3px 8px; vertical-align: top;}
-  table.rev_history tr.top_row td {border-top: 1px solid #7F7F7F;}
-  table.rev_history tr.alt_row {background: #f1f5fa;}
-  div#showhideBlock { display: block; }
-  div#hideBlockIcon { display: inline; }
-  div#showBlockIcon { display: none; }
-  div#showhideInline1 { display: inline; }
-  div#showhideInline2 { display: inline; }
-  div#showhideInline3 { display: inline; }
-  div#showhideInline4 { display: none; }
-  div#showhideBlock9 { display: block; }
-  div#hideBlockIcon9 { display: inline; }
-  div#showBlockIcon9 { display: none; }
-  --></Style>
-  <Base href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h&ra=s&rg=b&c=t39@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/">
-<link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
-<meta name="viewport" content="width=760, initial-scale=0.4, minimum-scale=0.4" />
-</Head>
-<Body bgcolor="#ffffff" leftmargin="0" topmargin="0" marginwidth="0" marginheight="0" onClick="hideMenu()">
-<!-- BEGIN INFO PANE -->
-<Table Border="0" Width="100%" Cellpadding="0" Cellspacing="1">
-<tr>
-<td>
-<Table Border="0" Width="100%" Cellpadding="0" Cellspacing="1" Bgcolor="#7F7F7F">
-<tr>
-<td colspan="5">
-<Table Border="0" Width="100%" Cellpadding="0" Cellspacing="0" class="fHeader">
-<tr>
-<td valign="middle" rowspan="2" class="logo">
-<img src="/logoviewerIcon?ac=20" height="46" width="114" border="0" alt="" title="" vspace="0"></td>
-<td class="statusLabel">
-Server:
-</td>
-<td width="100%">
-<Table Border="0" Cellspacing="0">
-<tr>
-<td class="connectionField">
-<a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h&ra=s&rg=b&c=t39@//?ac=151" class="status">perforce.freebsd.org:1666
-</a>
-</td>
-<td class="statusLabel">
-Client:
-<td class="connectionField">
-realcgi
-</td>
-</tr>
-</Table>
-</td>
-</tr>
-<tr>
-<td class="statusPath">
-Path:
-</td>
-<Form method="POST" enctype="application/x-www-form-urlencoded" action="ext4fs.h?ac=152">
-<td class="pathField">
-<Input type=text name="goField" value="//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h" size="92">
-&nbsp;
-<Input type=submit name="Go" value="Go">
-</td>
-</Form>
-</tr>
-</Table>
-<!-- END INFO PANE -->
-<!-- BEGIN MENU BAR PANE -->
-<script language="JavaScript1.2">
-function go( selId ) {
-location = selId.options[selId.selectedIndex].value
-}
+/*-
+ *  modified for EXT2FS support in Lites 1.1
+ *
+ *  Aug 1995, Godmar Back (gback@cs.utah.edu)
+ *  University of Utah, Department of Computer Science
+ *
+ * $FreeBSD: src/sys/fs/ext4fs/ext4fs.h,v 1.1 2010/09/16 20:46:00 lz Exp $
+ */
+/*-
+ * Copyright (c) 2009 Aditya Sarawgi
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ * 
+ */
 
-function setCheckedValue(radioObj, newValue) {
- if(!radioObj)
-	return;
- var radioLength = radioObj.length;
- if(radioLength == undefined) {
-	radioObj.checked = (radioObj.value == newValue.toString());
-	return;
- }
- for(var i = 0; i < radioLength; i++) {
-	radioObj[i].checked = false;
-	if(radioObj[i].value == newValue.toString()) {
-		radioObj[i].checked = true;
-	}
- }
-}
-</script>
-<!-- BEGIN TABS -->
-<Table Border="0" Width="100%" Cellpadding="0" Cellspacing="0">
-<tr>
-<td>
-<Table Border="0" Width="100%" Cellpadding="0" Cellspacing="0">
-<tr bgcolor="#C4C3C3">
-<td>
-<Form>
-</td>
-<td bgcolor="#EEEEEE" nowrap class="actab">
-<a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h&ra=s&rg=b&c=t39@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h?ac=22" class="tab"><img src="/fileIcon?ac=20" height="25" width="25" border="0" alt="" title="" align="absmiddle">Files</a>&nbsp;&nbsp;</td>
-<td nowrap class="tabs">
-<a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h&ra=s&rg=b&c=t39@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h?ac=69&mx=50" class="tab"><img src="/submittedChangelistIcon?ac=20" height="25" width="25" border="0" alt="" title="" align="absmiddle">Submitted</a>&nbsp;&nbsp;</td>
-<td nowrap class="tabs">
-<a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h&ra=s&rg=b&c=t39@//?ac=82" class="tab"><img src="/branchesIcon?ac=20" height="25" width="25" border="0" alt="" title="" align="absmiddle">Branches</a>&nbsp;&nbsp;</td>
-<td nowrap class="tabs">
-<a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h&ra=s&rg=b&c=t39@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h?ac=77" class="tab"><img src="/labelIcon?ac=20" height="25" width="25" border="0" alt="" title="" align="absmiddle">Labels</a>&nbsp;&nbsp;</td>
-<td nowrap class="tabs">
-<a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h&ra=s&rg=b&c=t39@//?ac=80" class="tab"><img src="/clientIcon?ac=20" height="25" width="25" border="0" alt="" title="" align="absmiddle">Clients</a>&nbsp;&nbsp;</td>
-<td nowrap class="tabs">
-<a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h&ra=s&rg=b&c=t39@//?ac=81" class="tab"><img src="/userIcon?ac=20" height="25" width="25" border="0" alt="" title="" align="absmiddle">Users</a>&nbsp;&nbsp;</td>
-<td nowrap class="tabs">
-<a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h&ra=s&rg=b&c=t39@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h?ac=107&mx=25" class="tab"><img src="/jobIcon?ac=20" height="25" width="25" border="0" alt="" title="" align="absmiddle">Jobs</a>&nbsp;&nbsp;</td>
-<td nowrap class="tabs">
-<a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h&ra=s&rg=b&c=t39@//?ac=79" class="tab"><img src="/settingsIcon?ac=20" height="25" width="25" border="0" alt="" title="" align="absmiddle">Settings</a>&nbsp;&nbsp;</td>
-<td>
-</Form>
-</td>
-</tr>
-</Table>
-</td>
-<td width="100%">
-<Table Width="100%" Cellpadding="0" Cellspacing="0">
-<tr bgcolor="#C4C3C3">
-<td width="100%" nowrap class="tabsspr">
-<img src="/clearpixelIcon?ac=20" height="25" width="100%" border="0" alt="" title=""></td>
-</tr>
-</Table>
-</td>
-</tr>
-<!-- END TABS -->
-<!-- BEGIN SUBNAVIGATION -->
-<tr bgcolor="#EEEEEE">
-<td>
-<Table Border="0" Cellpadding="0" Cellspacing="0">
-<tr>
-<td width="10">
-<img src="/clearpixelIcon?ac=20" height="30" width="10" border="0" alt="" title=""></td>
+#ifndef _FS_EXT4FS_EXT4_FS_H
+#define _FS_EXT4FS_EXT4_FS_H
 
-<script language=javascript>
-</script>
-<noscript>
-<td>
-<Form method="POST" enctype="application/x-www-form-urlencoded" action="ext4fs.h?ac=84">
-</td>
-</noscript>
-<td width="1">
+#include <sys/types.h>
+#include <sys/lock.h>
 
-<script language=javascript>
-</script>
-<noscript>
-<Select name="viewValue" size ="1" onChange="go( this )">
-</noscript>
+#include <fs/ext4fs/ext4_rsv_win.h>
 
-<script language=javascript>
-document.write("<a href='javascript:showMenu(\"ext4fs.h\",\"a1\",\"file\",-1,\"\")' id='id_a1' title ='Menu'><nobr>Actions<img src='/clearpixelIcon?ac=20' height='25' width='2' border='0' alt='' align=absmiddle title=''><img src='/menuarrowtoolbarIcon?ac=20' height='25' width='15' border='0' alt='' align=absmiddle title=''></nobr></a></td><td valign='middle' align='right' width='3'><img src='/grayPixelIcon?ac=20' height='18' width='1' border='0' alt='' title='' vspace='0' hspace='0'>")
-</script>
-<noscript>
-<Option selected value="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h&ra=s&rg=b&c=t39@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h?ac=22">
-Revision history
-<Option value="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h&ra=s&rg=b&c=t39@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h">
-Open head revision in browser
-<Option value="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h&ra=s&rg=b&c=t39@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h?ac=64">
-View head revision text
-<Option value="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h&ra=s&rg=b&c=t39@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h?ac=142">
-View annotated file text
-<Option value="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h&ra=s&rg=b&c=t39@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h?ac=205">
-Diff two depot files...
-</Select>
-</td>
-<td width="3">
-<img src="/clearpixelIcon?ac=20" height="30" width="3" border="0" alt="" title=""></td>
-<td width="40">
-<Input type=submit name="view" value="Go">
-</td>
-<td>
-</Form>
-</td>
-</noscript>
-<td valign="middle" align="center" width="2">
-<img src="/clearpixelIcon?ac=20" height="1" width="2" border="0" alt="" title="" vspace="0" hspace="0"></a>
-</td>
-<td width="25">
-<a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h&ra=s&rg=b&c=t39@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/?ac=83"><img src="/gotreeIcon?ac=20" height="25" width="25" border="0" alt="Display tree view" title="Display tree view"></a>
-</td>
-<td valign="middle" align="center" width="7">
-<img src="/grayPixelIcon?ac=20" height="18" width="1" border="0" alt="" title="" vspace="0" hspace="0"><img src="/clearpixelIcon?ac=20" height="1" width="2" border="0" alt="" title="" vspace="0" hspace="0"></td>
-<td width="25">
-<a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h&ra=s&rg=b&c=t39@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h?ac=22"><img src="/list_icon_onIcon?ac=20" height="25" width="25" border="0" alt="Display revision history" title="Display revision history"></a></td>
-<td width="25">
-<a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h&ra=s&rg=b&rt=s&thv=d&c=t39@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h?ac=22"><img src="/details_icon_offIcon?ac=20" height="25" width="25" border="0" alt="Display revision history" title="Display revision history"></a></td>
-<td width="25">
-<a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h&ra=s&rg=b&rt=s&c=t39@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h?ac=22"><img src="/thumbnails_icon_offIcon?ac=20" height="25" width="25" border="0" alt="Display revision history thumbnails" title="Display revision history thumbnails"></a></td>
-<td width="13">
-<script language=javascript>
-document.write("<a href='javascript:showMenu(\"\",\"toolbarthumbs\",\"Thumbs\",-1,\"\")' id='id_toolbarthumbs'><img src='/menuarrowtoolbarIcon?ac=20' height='25' width='15' border='0' alt='' title='Thumbnail options'></a>")
-</script>
-<noscript>
-<a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h&ra=s&rg=b&c=t39@//?ac=79"><img src="/menuarrowtoolbarIcon?ac=20" height="25" width="15" border="0" alt="" title=""></a>
-</noscript>
+/*
+ * Special inode numbers
+ */
+#define	EXT2_BAD_INO		 1	/* Bad blocks inode */
+#define EXT2_ROOT_INO		 2	/* Root inode */
+#define EXT2_BOOT_LOADER_INO	 5	/* Boot loader inode */
+#define EXT2_UNDEL_DIR_INO	 6	/* Undelete directory inode */
 
-<div id="menu_Thumbs" class="mu" style="display:none"><Table Width="10">
-<tr>
-<td nowrap>
-<div id="id_muThumbs1" style="display:none" onMouseOver="showhi('id_muThumbs1')" onMouseOut="hidehi('id_muThumbs1')"><a href="javascript:runurl('/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h&ra=s&rg=b&rt=s&c=t39@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h?ac=22')"><img src="bulletIcon?ac=20" height="12" width="8" border="0" alt="" title="" align="top" id="id_muThumbs1p"><img src="bullethighlightedIcon?ac=20" height="12" width="8" border="0" alt="" title="" align="top" id="id_muThumbs1h"><nobr> Large 160x160</nobr></a><br>
-</div>
-<div id="id_muThumbs2" style="display:none"><a href="javascript:runurl('/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h&ra=s&rg=b&rt=s&thz=m&c=t39@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h?ac=22')"><img src="/clearpixelIcon?ac=20" height="12" width="8" border="0" alt="" title="" align="top"><nobr> Medium 120x120</nobr></a><br>
-</div>
-<div id="id_muThumbs4" style="display:none"><a href="javascript:runurl('/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h&ra=s&rg=b&rt=s&thz=s&c=t39@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h?ac=22')"><img src="/clearpixelIcon?ac=20" height="12" width="8" border="0" alt="" title="" align="top"><nobr> Small 80x80</nobr></a><br>
-</div>
-<div id="id_muThumbs8" style="display:none"><img src="/grayPixelIcon?ac=20" height="1" width="100%" border="0" alt="" title="" vspace="2" hspace="0"><br>
-</div>
-<div id="menuThumbs" class="menu">
-<div id="id_muThumbs16" style="display:none"><a href="javascript:runurl('/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h&ra=s&rg=b&c=t39@//?ac=79')"><img src="/clearpixelIcon?ac=20" height="12" width="8" border="0" alt="" title="" align="top"><nobr> Columns &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &gt;&gt;</a></nobr></a><br>
-</div>
-<ul>
-<Table Width="30%" Cellpadding="2" Bgcolor="#c0c0c0">
-<tr bgcolor="#e6e6e6">
-<td>
-  <li><a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h&ra=s&rg=b&rt=s&thc=1&c=t39@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h?ac=22">&nbsp;&nbsp;1&nbsp;&nbsp;&nbsp;&nbsp;</a></li>
-  <li><a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h&ra=s&rg=b&rt=s&thc=2&c=t39@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h?ac=22">&nbsp;&nbsp;2&nbsp;&nbsp;&nbsp;&nbsp;</a></li>
-  <li><a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h&ra=s&rg=b&rt=s&thc=3&c=t39@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h?ac=22">&nbsp;&nbsp;3&nbsp;&nbsp;&nbsp;&nbsp;</a></li>
-  <li class="bullet"><a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h&ra=s&rg=b&rt=s&c=t39@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h?ac=22">&nbsp;&nbsp;4&nbsp;&nbsp;&nbsp;&nbsp;</a></li>
-  <li><a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h&ra=s&rg=b&rt=s&thc=5&c=t39@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h?ac=22">&nbsp;&nbsp;5&nbsp;&nbsp;&nbsp;&nbsp;</a></li>
-  <li><a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h&ra=s&rg=b&rt=s&thc=6&c=t39@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h?ac=22">&nbsp;&nbsp;6&nbsp;&nbsp;&nbsp;&nbsp;</a></li>
-  <li><a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h&ra=s&rg=b&rt=s&thc=7&c=t39@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h?ac=22">&nbsp;&nbsp;7&nbsp;&nbsp;&nbsp;&nbsp;</a></li>
-  <li><a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h&ra=s&rg=b&rt=s&thc=8&c=t39@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h?ac=22">&nbsp;&nbsp;8&nbsp;&nbsp;&nbsp;&nbsp;</a></li>
-  <li><a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h&ra=s&rg=b&rt=s&thc=9&c=t39@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h?ac=22">&nbsp;&nbsp;9&nbsp;&nbsp;&nbsp;&nbsp;</a></li>
-  <li><a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h&ra=s&rg=b&rt=s&thc=10&c=t39@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h?ac=22">&nbsp;10&nbsp;&nbsp;&nbsp;&nbsp;</a></li>
-</td>
-</tr>
-</Table>
-  </ul>
-</div><div id="id_muThumbs32" style="display:none"><a href="javascript:runurl('/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h&ra=s&rg=b&rt=s&thw=y&c=t39@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h?ac=22')"><img src="/clearpixelIcon?ac=20" height="12" width="8" border="0" alt="" title="" align="top"><nobr> Autowrap Thumbnails&nbsp;</nobr></a><br>
-</div>
-<div id="id_muThumbs64" style="display:none"><img src="/grayPixelIcon?ac=20" height="1" width="100%" border="0" alt="" title="" vspace="2" hspace="0"><br>
-</div>
-<div id="id_muThumbs128" style="display:none"><a href="javascript:runurl('/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h&ra=s&rg=b&rt=s&thm=y&c=t39@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h?ac=22')"><img src="/clearpixelIcon?ac=20" height="12" width="8" border="0" alt="" title="" align="top"><nobr> Magnify Small Images&nbsp;</nobr></a><br>
-</div>
-<div id="id_muThumbs256" style="display:none"><a href="javascript:runurl('/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h&ra=s&rg=b&rt=s&thb=y&c=t39@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h?ac=22')"><img src="/clearpixelIcon?ac=20" height="12" width="8" border="0" alt="" title="" align="top"><nobr> Show Borders</nobr></a><br>
-</div>
-</td>
-</tr>
-</Table>
-</div></td>
-<td valign="middle" align="center" width="2">
-<img src="/clearpixelIcon?ac=20" height="1" width="2" border="0" alt="" title="" vspace="0" hspace="0"></a>
-</td>
-<td width="25">
-<a href="ext4fs.h?ac=22&fl=-i"><img src="/branchHistOffIcon?ac=20" height="25" width="25" border="0" alt="Show branching history" title="Show branching history"></a>
-</td>
-<td valign="middle" align="center" width="7">
-<img src="/clearpixelIcon?ac=20" height="1" width="2" border="0" alt="" title="" vspace="0" hspace="0"><img src="/grayPixelIcon?ac=20" height="18" width="1" border="0" alt="" title="" vspace="0" hspace="0"></td>
-<td valign="middle" align="center" width="2">
-<img src="/clearpixelIcon?ac=20" height="1" width="2" border="0" alt="" title="" vspace="0" hspace="0"></a>
-</td>
-<td width="25">
-<a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h&ra=s&rg=b&c=t39@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h?ac=64"><img src="/showtextIcon?ac=20" height="25" width="25" border="0" alt="View head revision text" title="View head revision text"></a>
-</td>
-<td valign="middle" align="center" width="7">
-<img src="/clearpixelIcon?ac=20" height="1" width="4" border="0" alt="" title="" vspace="0" hspace="0"><img src="/grayPixelIcon?ac=20" height="18" width="1" border="0" alt="" title="" vspace="0" hspace="0"></a>
-</td>
-<td valign="middle" align="center" width="3">
-<img src="/clearpixelIcon?ac=20" height="1" width="3" border="0" alt="" title="" vspace="0" hspace="0"></a>
-</td>
-<td align="right">
-<a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h&ra=s&rg=b&c=t39@//?ac=144&lac=22"><img src="/cancelIcon?ac=20" height="25" width="25" border="0" alt="Cancel operation" title="Cancel operation"></a></td>
-<td valign="middle" align="center" width="4">
-<img src="/clearpixelIcon?ac=20" height="1" width="4" border="0" alt="" title="" vspace="0" hspace="0"></a>
-</td>
-<td valign="middle" align="center" width="6">
-<img src="/grayPixelIcon?ac=20" height="18" width="1" border="0" alt="" title="" vspace="0" hspace="0"></a>
-</td>
-<td width="25">
-<a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h&rg=b&c=t39@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h?ac=22"><img src="/recentactivityOnIcon?ac=20" height="25" width="25" border="0" alt="Hide recent activity bar" title="Hide recent activity bar"></a>
-</td>
-<td valign="middle" align="center" width="2">
-<img src="/clearpixelIcon?ac=20" height="1" width="2" border="0" alt="" title="" vspace="0" hspace="0"></a>
-</td>
-<td width="25">
-<a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h&ra=s&c=t39@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h?ac=22"><img src="/goOnIcon?ac=20" height="25" width="25" border="0" alt="Hide go to bar" title="Hide go to bar"></a>
-</td>
-<td valign="middle" align="center" width="11">
-<img src="/clearpixelIcon?ac=20" height="1" width="5" border="0" alt="" title="" vspace="0" hspace="0"><img src="/grayPixelIcon?ac=20" height="18" width="1" border="0" alt="" title="" vspace="0" hspace="0"></a>
-</td>
-<td width="25">
-<a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h&ra=s&rg=b&c=t39@//?ac=151"><img src="/infoIcon?ac=20" height="25" width="25" border="0" alt="Information" title="Information"></a>
-</td>
-<td valign="middle" align="center" width="2">
-<img src="/clearpixelIcon?ac=20" height="1" width="2" border="0" alt="" title="" vspace="0" hspace="0"></a>
-</td>
-<td width="30">
-<a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h&ra=s&rg=b@//filebrowser?ac=21" class="nav_link"><img src="/helpIcon?ac=20" height="25" width="25" border="0" alt="Help" title="Help"></a>
-</td>
-</tr>
-</Table>
-</td>
-<td nowrap>
-</td>
-</tr>
-</Table>
-<div id="menu_revhist" class="mu" style="display:none">
-<Table Width="10">
-<tr>
-<td nowrap>
+/* First non-reserved inode for old ext2 filesystems */
+#define E2FS_REV0_FIRST_INO	11
 
-<div id="id_murevhist1" style="display:none"><a href="javascript:runcmd(98)"><img src="/clearpixelIcon?ac=20" height="17" width="21" border="0" alt="" title="" align="top"><nobr>Open Revision in Browser&nbsp;</nobr></a>
-<br>
-</div><div id="id_murevhist2" style="display:none" onMouseOver="showhi('id_murevhist2')" onMouseOut="hidehi('id_murevhist2')"><a href="javascript:runcmd(64)"><img src="/showtext17Icon?ac=20" height="17" width="21" border="0" alt="" title="" align="top" id="id_murevhist2p"><img src="/showtext17highlightedIcon?ac=20" height="17" width="21" border="0" alt="" title="" align="top" id="id_murevhist2h"><nobr>View Revision Text</nobr></a>
-<br>
-</div><div id="id_murevhist4" style="display:none"><img src="/grayPixelIcon?ac=20" height="1" width="100%" border="0" alt="" title="" vspace="2" hspace="0"><br>
-</div><div id="id_murevhist8" style="display:none" onMouseOver="showhi('id_murevhist8')" onMouseOut="hidehi('id_murevhist8')"><a href="javascript:runcmd(185)"><img src="/rundiffprev17Icon?ac=20" height="17" width="21" border="0" alt="" title="" align="top" id="id_murevhist8p"><img src="/rundiffprev17highlightedIcon?ac=20" height="17" width="21" border="0" alt="" title="" align="top" id="id_murevhist8h"><nobr>Diff vs. Previous Revision</nobr></a>
-<br>
-</div><div id="id_murevhist16" style="display:none"><a href="javascript:if (validateFilelogForm()) document.filelogForm.submit();"><img src="/clearpixelIcon?ac=20" height="17" width="21" border="0" alt="" title="" align="top"><nobr>Diff vs. Selected Revision</nobr></a>
-<br>
-</div></td>
-</tr>
-</Table>
-</div>
-</td>
-</tr>
-<!-- END SUBNAVIGATION -->
-<!-- END MENU BAR PANE -->
-<!-- BEGIN GOTO PANE -->
-<tr bgcolor="#EEEEEE">
-<td colspan="5">
-<Table Width="100%" Cellpadding="1" Cellspacing="5" Bgcolor="#EEEEEE">
-<tr bgcolor="#EEEEEE">
-<td>
-<Form method="POST" enctype="application/x-www-form-urlencoded" action="ext4fs.h?ac=204">
-</td>
-<td nowrap>
-Go to:
-<Select name="type">
-<Option value=S>
-Changelist
-<Option selected value=B>
-Branch
-<Option value=L>
-Label
-<Option value=C>
-Client
-<Option value=U>
-User
-<Option value=J>
-Job
-</Select>
-<Input type=text name="p4" value="" size="60">
-<Input type=submit name="p4go" value="Go">
-</td>
-<td>
-</Form>
-</td>
-</tr>
-</td>
-</tr>
-</Table>
-<!-- END GOTO PANE -->
-<!-- BEGIN UPDATE PANE -->
-<tr bgcolor="#FDE8B0">
-<td valign="top" class="recent_activity">
-<a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h&ra=s&rg=b&c=t39@/183855?ac=10" class="nav_link">183855</a>&nbsp;2010/09/16 <span style="color: #A10000; font-weight: bold">lz</span>        Rename file prefix name </span></td>
-<td valign="top" class="recent_activity">
-<a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h&ra=s&rg=b&c=t39@/183858?ac=10" class="nav_link">183858</a>&nbsp;2010/09/16 <span style="color: #A10000; font-weight: bold">lz</span>        Make ext4fs can be compi</span></td>
-</tr>
-<!-- END UPDATE PANE -->
-</Table>
-</td>
-</tr>
-<tr>
-<td>
-<Table Border="0" Width="100%" Cellpadding="0" Cellspacing="0">
-<tr>
-<td width="10">
-<img src="/clearpixelIcon?ac=20" height="1" width="10" border="0" alt="" title=""></td>
-<td width="100%">
-<Table Border="0" Width="100%" Cellpadding="0" Cellspacing="0">
-<tr>
-<td>
-<img src="/clearpixelIcon?ac=20" height="5" width="0" border="0" alt="" title=""></td>
-</tr>
-<!-- BEGIN FILEBROWSER PANE -->
-<tr>
-<td colspan="3">
-<Table>
-<tr>
-<td>
-<span class="title">Revision History: &nbsp;</span></td>
-</tr>
-</Table>
-</td>
-</tr>
-<tr>
-<td valign="top" colspan="3">
-<img src="/grayPixelIcon?ac=20" height="1" width="100%" border="0" alt="" title="" vspace="0" hspace="0"></td>
-</tr>
-<tr>
-<td width="100%">
-<Table Width="100%" Cellpadding="0" Cellspacing="0">
-<tr>
-<td>
-<img src="/clearpixelIcon?ac=20" height="5" width="5" border="0" alt="" title=""><div id="menu_file" class="mu" style="display:none">
-<Table Width="10">
-<tr>
-<td nowrap>
+/*
+ * The second extended file system magic number
+ */
+#define E2FS_MAGIC		0xEF53
 
-<div id="id_mufile1" style="display:none" onMouseOver="showhi('id_mufile1')" onMouseOut="hidehi('id_mufile1')"><a href="javascript:runcmd(22)"><img src="/showfilelog17Icon?ac=20" height="17" width="21" border="0" alt="" title="" align="top" id="id_mufile1p"><img src="/showfilelog17highlightedIcon?ac=20" height="17" width="21" border="0" alt="" title="" align="top" id="id_mufile1h"><nobr>Revision History</nobr></a><br>
-</div><div id="id_mufile5" style="display:none"><img src="/grayPixelIcon?ac=20" height="1" width="100%" border="0" alt="" title="" vspace="2" hspace="0"><br>
-</div><div id="id_mufile4" style="display:none"><a href="javascript:runcmd(98)"><img src="/clearpixelIcon?ac=20" height="17" width="21" border="0" alt="" title="" align="top"><nobr>Open Head Rev in Browser</nobr></a><br>
-</div><div id="id_mufile17" style="display:none"><img src="/grayPixelIcon?ac=20" height="1" width="100%" border="0" alt="" title="" vspace="2" hspace="0"><br>
-</div><div id="id_mufile68" style="display:none"><img src="/grayPixelIcon?ac=20" height="1" width="100%" border="0" alt="" title="" vspace="2" hspace="0"><br>
-</div><div id="id_mufile1025" style="display:none"><img src="/grayPixelIcon?ac=20" height="1" width="100%" border="0" alt="" title="" vspace="2" hspace="0"><br>
-</div><div id="id_mufile512" style="display:none" onMouseOver="showhi('id_mufile512')" onMouseOut="hidehi('id_mufile512')"><a href="javascript:runcmd(64)"><img src="/showtext17Icon?ac=20" height="17" width="21" border="0" alt="" title="" align="top" id="id_mufile512p"><img src="/showtext17highlightedIcon?ac=20" height="17" width="21" border="0" alt="" title="" align="top" id="id_mufile512h"><nobr>View Head Revision Text</nobr></a><br>
-</div><div id="id_mufile513" style="display:none"><a href="javascript:runcmd(203)"><img src="/clearpixelIcon?ac=20" height="17" width="21" border="0" alt="" title="" align="top"><nobr>View Annotated File Text</nobr></a><br>
-</div><div id="id_mufile6" style="display:none"><img src="/grayPixelIcon?ac=20" height="1" width="100%" border="0" alt="" title="" vspace="2" hspace="0"><br>
-<a href="javascript:runcmd(205)"><img src="/clearpixelIcon?ac=20" height="17" width="21" border="0" alt="" title="" align="top"><nobr>Diff Two Depot Files... &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;</nobr></a><br>
-</div><div id="id_mufile262145" style="display:none"><img src="/grayPixelIcon?ac=20" height="1" width="100%" border="0" alt="" title="" vspace="2" hspace="0"><br>
-</div></td>
-</tr>
-</Table>
-</div>
-<script language=javascript>
-setmushow(362079);
-</script>
-</td>
-</tr>
-<tr>
-<td valign="top">
+#if defined(_KERNEL)
+/*
+ * FreeBSD passes the pointer to the in-core struct with relevant
+ * fields to EXT2_SB macro when accessing superblock fields.
+ */
+#define EXT2_SB(sb)	(sb)
+#else
+/* Assume that user mode programs are passing in an ext2fs superblock, not
+ * a kernel struct super_block.  This will allow us to call the feature-test
+ * macros from user land. */
+#define EXT2_SB(sb)	(sb)
+#endif
 
-<script language=javascript>
-function toggleFileDetails()
-{
-var elem, vis, viss, vish, vis1, vis2, vis3, vis4;
-if( document.getElementById )
-	elem = document.getElementById( 'showhideBlock' );
-else if( document.all )
-	elem = document.all['showhideBlock'];
-else if( document.layers )
-	elem = document.layers['showhideBlock'];
-vis = elem.style;
-if(vis.display==''&&elem.offsetWidth!=undefined&&elem.offsetHeight!=undefined)
-	vis.display = (elem.offsetWidth!=0&&elem.offsetHeight!=0)?'block':'none';
-vis.display = (vis.display==''||vis.display=='block')?'none':'block';
-if( document.getElementById )
-	elem = document.getElementById( 'showBlockIcon' );
-else if( document.all )
-	elem = document.all['showBlockIcon'];
-else if( document.layers )
-	elem = document.layers['showBlockIcon'];
-viss = elem.style;
-viss.display = (vis.display==''||vis.display=='block')?'none':'inline';
-if( document.getElementById )
-	elem = document.getElementById( 'hideBlockIcon' );
-else if( document.all )
-	elem = document.all['hideBlockIcon'];
-else if( document.layers )
-	elem = document.layers['hideBlockIcon'];
-vish = elem.style;
-vish.display = (vis.display==''||vis.display=='block')?'inline':'none';
-if( document.getElementById )
-	elem = document.getElementById( 'showhideInline1' );
-else if( document.all )
-	elem = document.all['showhideInline1'];
-else if( document.layers )
-	elem = document.layers['showhideInline1'];
-vis1 = elem.style;
-vis1.display = (vis.display==''||vis.display=='block')?'inline':'none';
-if( document.getElementById )
-	elem = document.getElementById( 'showhideInline2' );
-else if( document.all )
-	elem = document.all['showhideInline2'];
-else if( document.layers )
-	elem = document.layers['showhideInline2'];
-vis2 = elem.style;
-vis2.display = (vis.display==''||vis.display=='block')?'inline':'none';
-if( document.getElementById )
-	elem = document.getElementById( 'showhideInline3' );
-else if( document.all )
-	elem = document.all['showhideInline3'];
-else if( document.layers )
-	elem = document.layers['showhideInline3'];
-vis3 = elem.style;
-vis3.display = (vis.display==''||vis.display=='block')?'inline':'none';
-if( document.getElementById )
-	elem = document.getElementById( 'showhideInline4' );
-else if( document.all )
-	elem = document.all['showhideInline4'];
-else if( document.layers )
-	elem = document.layers['showhideInline4'];
-vis4 = elem.style;
-vis4.display = (vis.display==''||vis.display=='block')?'none':'inline';
-}
-document.write("<a href='javascript:toggleFileDetails();' title='Show/Hide File Details'>")
-document.write("<div id='showBlockIcon'>")
-document.write("<img src='/plusBoxIcon?ac=20' height='20' width='20' border='0' alt='Show File Details' title='Show File Details'>")
-document.write("</div>")
-document.write("<div id='hideBlockIcon'>")
-document.write("<img src='/minusBoxIcon?ac=20' height='20' width='20' border='0' alt='Hide File Details' title='Hide File Details'>")
-document.write("</div>")
-document.write("</a>")
-document.write("</td><td width='100%'>")
-</script>
-<span class="path"><b>
-<a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&ra=s&rg=b&c=t39@//?ac=83" class="bigger">//</a><a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&ra=s&rg=b&c=t39@//depot/?ac=83" class="bigger">depot</a><span class="bigger">/</span><a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&ra=s&rg=b&c=t39@//depot/projects/?ac=83" class="bigger">projects</a><span class="bigger">/</span><a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&ra=s&rg=b&c=t39@//depot/projects/soc2010/?ac=83" class="bigger">soc2010</a><span class="bigger">/</span><a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&ra=s&rg=b&c=t39@//depot/projects/soc2010/ext4fs/?ac=83" class="bigger">ext4fs</a><span class="bigger">/</span><a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&ra=s&rg=b&c=t39@//depot/projects/soc2010/ext4fs/src/?ac=83" class="bigger">src</a><span class="bigger">/</span><a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&ra=s&rg=b&c=t39@//depot/projects/soc2010/ext4fs/src/sys/?ac=83" class="bigger">sys</a><span class="bigger">/</span><a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&ra=s&rg=b&c=t39@//depot/projects/soc2010/ext4fs/src/sys/fs/?ac=83" class="bigger">fs</a><span class="bigger">/</span><a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&ra=s&rg=b&c=t39@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/?ac=83" class="bigger">ext4fs</a><span class="bigger">/</span><a href="ext4fs.h?ac=22" class="bigger">ext4fs.h</a></b>
-</span></td>
-</tr>
-<tr>
-<td colspan="2">
-<script language=javascript>
-document.write("<div id='showhideBlock'>")
-</script>
-<Table Border="0" Width="100%" Cellpadding="4" Cellspacing="0" Bgcolor="#FFFFFF">
-<tr bgcolor="#FFFFFF">
-<td>
-<Table Border="0" Cellpadding="2" Cellspacing="0" Bgcolor="#FFFFFF">
-<tr>
-<td>
-<span class="label">Type:
-</span></td>
-<td>
-<img src="/clearpixelIcon?ac=20" height="1" width="5" border="0" alt="" title=""></td>
-<td>
-text+ko
-</td>
-<td>
-<img src="/clearpixelIcon?ac=20" height="1" width="30" border="0" alt="" title=""></td>
-<td>
-<span class="label"></span></td>
-<td>
-<img src="/clearpixelIcon?ac=20" height="1" width="5" border="0" alt="" title=""></td>
-<td>
-</td>
-<td>
-<img src="/clearpixelIcon?ac=20" height="1" width="30" border="0" alt="" title=""></td>
-<td>
-<span class="label">Head rev size:</span></td>
-<td>
-<img src="/clearpixelIcon?ac=20" height="1" width="5" border="0" alt="" title=""></td>
-<td>
-16.16&nbsp;KB</td>
-</tr>
-<tr>
-</tr>
-<tr>
-<td>
-<span class="label">Head:</span></td>
-<td>
-<img src="/clearpixelIcon?ac=20" height="1" width="5" border="0" alt="" title=""></td>
-<td>
-<a href="//127.0.1.3:2083/@rev1=head@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h" title="Open head revision in browser">#2</a>
-</td>
-<td>
-<img src="/clearpixelIcon?ac=20" height="1" width="30" border="0" alt="" title=""></td>
-</tr>
-<tr>
-<td colspan="11">
-<Table Cellpadding="0" Cellspacing="0">
-<tr>
-<td nowrap>
-</td>
-</tr>
-</Table>
-</td>
-</tr>
-</Table>
-</td>
-</tr>
-</Table>
-<script language=javascript>
-document.write("</div>")
-</script>
-</td>
-</tr>
-</Table>
-</td>
-</tr>
-<tr>
-<td valign="top" colspan="3" width="100%">
-<div id="showhideInline1">
-<img src="/grayPixelIcon?ac=20" height="1" width="100%" border="0" alt="" title="" vspace="0" hspace="0"></div>
-</td>
-</tr>
-</tr>
-</Table>
-</td>
-<td width="10">
-<img src="/clearpixelIcon?ac=20" height="1" width="10" border="0" alt="" title=""></td>
-</tr>
-</Table>
-</td>
-</tr>
-</Table>
-</td>
-</tr>
-<!-- END FILEBROWSER PANE -->
-<!-- BEGIN FILELOG PANE -->
-<Table Border="0" Width="100%" Cellpadding="0" Cellspacing="1">
-<tr>
-<td width="8">
-<img src="/clearpixelIcon?ac=20" height="1" width="8" border="0" alt="" title=""></td>
-<td>
-<Table Border="0" Width="100%" Cellpadding="0" Cellspacing="1">
-<tr>
-<td>
-<img src="/clearpixelIcon?ac=20" height="10" width="1" border="0" alt="" title=""></td>
-</tr>
-<tr>
-<td>
-<Form method="POST" enctype="application/x-www-form-urlencoded" action="ext4fs.h?ac=191" name="filelogForm">
-<Input type=hidden name="rev2">
-<Table Cellspacing="0" class="rev_history">
-<tr>
-<div id="diff2Help" class="ttip" style="display:none"><nobr>To diff 2 revisions:<br>
-&nbsp; 1) Select radio button for first revision<br>
-&nbsp; 2) Choose &quot;Diff vs. Selected Revision&quot; from the&nbsp;<br>
-&nbsp; &nbsp; &nbsp; drop down menu of the second revision.</nobr></div><script language=javascript>
-document.write("<th align='center' style='padding:0 0'><center><div id=\"diff2Icon\"><a onMouseOver='showDiv(\"diff2Help\", \"diff2Icon\")' onMouseOut='hideDiv(\"diff2Help\")'><img src='/rundiff17Icon?ac=20' height='17' width='21' border='0' alt='' title=''></div></a></center></th><th style='padding:0 0'><img src='/clearpixelIcon?ac=20' height='1' width='1' border='0' alt='' title=''></th>")</script>
-<th align="left">
-Rev<img src="/clearpixelIcon?ac=20" height="0" width="78" border="0" alt="" title=""></th>
-<th align="left">
-Changelist</th>
-<th align="left">
-Date</th>
-<th align="left">
-User</th>
-<th align="left">
-Type</th>
-<th align="left" width="60%">
-Changelist&nbsp;Description/Action</th>
-</tr>
-<tr valign="top" class="top_row">
-<script language=javascript>
-document.write("<td rowspan='2'>")
-document.write("<Input type=radio name='revs' value='2' id='2' title='Select #2'></td><td rowspan='2' bgcolor='#dfe3e8' style='padding:0 0'></td>")
-</script>
-<td rowspan="1">
-<a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h&ra=s&rg=b&sr=183858&c=t39@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h" title="Open revision in browser"><b>&nbsp;2&nbsp;</b></a><script language=javascript>
-document.write("<span class='muaro'><a title='Menu' href='javascript:showMenu(\"ext4fs.h\",\"0_2\",\"revhist\",-1,\"&rev1=2\")' onClick='document.forms.filelogForm.rev2.value=\"2\";' id='id_0_2'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</a></span>")
-</script>
-</td>
-<td rowspan="2">
-<a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h&ra=s&rg=b&c=t39@/183858?ac=10" title="View changelist">183858</a></td>
-<td rowspan="2">
-2010/09/16</td>
-<td rowspan="2">
-lz</td>
-<td rowspan="2">
-text+ko</td>
-<td>
-       Make ext4fs can be compiled.<br></td>
-</tr>
-<tr>
-<td valign="bottom">
-<nobr><img src="/clearpixelIcon?ac=20" height="1" width="28" border="0" alt="" title=""><a href="ext4fs.h?ac=64&rev1=2" title="View revision text"><img src="/showtextsmallIcon?ac=20" height="18" width="25" border="0" alt="View revision text" title="View revision text"></a>
-<a href="ext4fs.h?ac=19&rev1=1&rev2=2"><img src="/rundiffprevsmallIcon?ac=20" height="18" width="25" border="0" alt="Diff rev #1 vs. rev #2" title="Diff rev #1 vs. rev #2"></a></nobr>
-</td>
-<td nowrap class="top_line">
-edit</td>
-</tr>
-<tr valign="top" class="alt_row">
-<script language=javascript>
-document.write("<td rowspan='2' class='top_line'>")
-document.write("<Input type=radio name='revs' value='1' id='1' title='Select #1'></td><td rowspan='2' bgcolor='#dfe3e8' style='padding:0 0'></td>")
-</script>
-<td rowspan="1" class="top_line">
-<a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h&ra=s&rg=b&sr=183855&c=t39@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h" title="Open revision in browser"><b>&nbsp;1&nbsp;</b></a><script language=javascript>
-document.write("<span class='muaro'><a title='Menu' href='javascript:showMenu(\"ext4fs.h\",\"0_1\",\"revhist\",247,\"&rev1=1\")' onClick='document.forms.filelogForm.rev2.value=\"1\";' id='id_0_1'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</a></span>")
-</script>
-</td>
-<td rowspan="2" class="top_line">
-<a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h&ra=s&rg=b&c=t39@/183855?ac=10" title="View changelist">183855</a></td>
-<td rowspan="2" class="top_line">
-2010/09/16</td>
-<td rowspan="2" class="top_line">
-lz</td>
-<td rowspan="2" class="top_line">
-text+ko</td>
-<td class="top_line">
-       Rename file prefix name from ext2_ to ext4_.<br></td>
-</tr>
-<tr class="alt_row">
-<td valign="bottom">
-<br>
-<nobr><img src="/clearpixelIcon?ac=20" height="1" width="28" border="0" alt="" title=""><a href="ext4fs.h?ac=64&rev1=1" title="View revision text"><img src="/showtextsmallIcon?ac=20" height="18" width="25" border="0" alt="View revision text" title="View revision text"></a></nobr>
-</td>
-<td nowrap class="top_line">
-branch<br>
-branch from <a href="/@md=d&cd=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/&cdf=//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h&ra=s&rg=b&c=t39@//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext2fs.h?ac=22">//depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext2fs.h</a>#1</td>
-</tr>
-</Table>
-</Form>
-</td>
-</tr>
-<!-- END FILELOG PANE -->
-</Table>
-</td>
-<td width="9">
-<img src="/clearpixelIcon?ac=20" height="1" width="9" border="0" alt="" title=""></td>
-</tr>
-</Table>
-</td>
-</tr>
-</Table>
-</Table>
-</Table>
-<Table Width="100%" Cellpadding="2" Cellspacing="0">
-<tr>
-<td>
-<img src="/clearpixelIcon?ac=20" height="10" width="1" border="0" alt="" title=""></td>
-</tr>
-<tr>
-<td width="5">
-<img src="/clearpixelIcon?ac=20" height="1" width="5" border="0" alt="" title=""></td>
-<td colspan="100%">
-<img src="/grayPixelIcon?ac=20" height="1" width="100%" border="0" alt="" title="" vspace="0" hspace="0"></td>
-<td width="5">
-<img src="/clearpixelIcon?ac=20" height="1" width="5" border="0" alt="" title=""></td>
-</tr>
-</Table>
-<Table Width="100%" Cellpadding="2" Cellspacing="0">
-<tr>
-<td width="5">
-<img src="/clearpixelIcon?ac=20" height="1" width="5" border="0" alt="" title=""></td>
-<td nowrap>
-<span class="copyright">Copyright 2008 Perforce Software. All rights reserved.</span></td>
-<td valign="top" align="right" class="permalink">
-<a href="/depot/projects/soc2010/ext4fs/src/sys/fs/ext4fs/ext4fs.h?ac=22">Permalink</a>
-</td>
-<td width="5">
-<img src="/clearpixelIcon?ac=20" height="1" width="5" border="0" alt="" title=""></td>
-</tr>
-</Table>
-</Body>
-</Html>
+/*
+ * Maximal count of links to a file
+ */
+#define EXT2_LINK_MAX		65000
+
+/*
+ * Constants relative to the data blocks
+ */
+#define	EXT2_NDIR_BLOCKS		12
+#define	EXT2_IND_BLOCK			EXT2_NDIR_BLOCKS
+#define	EXT2_DIND_BLOCK			(EXT2_IND_BLOCK + 1)
+#define	EXT2_TIND_BLOCK			(EXT2_DIND_BLOCK + 1)
+#define	EXT2_N_BLOCKS			(EXT2_TIND_BLOCK + 1)
+#define EXT2_MAXSYMLINKLEN		(EXT2_N_BLOCKS * sizeof (uint32_t))
+
+/*
+ * The path name on which the file system is mounted is maintained
+ * in fs_fsmnt. MAXMNTLEN defines the amount of space allocated in
+ * the super block for this name.
+ */
+#define MAXMNTLEN 512
+
+/* ext4 flex block group data structure */
+struct ext4_flex_groups {
+        long e2fg_nifree;
+        long e2fg_nbfree;
+        long e2fg_ndirs;
+};
+
+#define EXT4_FLEX_ALLOC_DIR_SIZE 4
+
+/*
+ * Super block for an ext2fs file system.
+ */
+struct ext2fs {
+	u_int32_t  e2fs_icount;		/* Inode count */
+	u_int32_t  e2fs_bcount_lo;	/* blocks count */
+	u_int32_t  e2fs_rbcount_lo;	/* reserved blocks count */
+	u_int32_t  e2fs_fbcount_lo;	/* free blocks count */
+	u_int32_t  e2fs_ficount;	/* free inodes count */
+	u_int32_t  e2fs_first_dblock;	/* first data block */
+	u_int32_t  e2fs_log_bsize;	/* block size = 1024*(2^e2fs_log_bsize) */
+	u_int32_t  e2fs_log_fsize;	/* fragment size */
+	u_int32_t  e2fs_bpg;		/* blocks per group */
+	u_int32_t  e2fs_fpg;		/* frags per group */
+	u_int32_t  e2fs_ipg;		/* inodes per group */
+	u_int32_t  e2fs_mtime;		/* mount time */
+	u_int32_t  e2fs_wtime;		/* write time */
+	u_int16_t  e2fs_mnt_count;	/* mount count */
+	u_int16_t  e2fs_max_mnt_count;	/* max mount count */
+	u_int16_t  e2fs_magic;		/* magic number */
+	u_int16_t  e2fs_state;		/* file system state */
+	u_int16_t  e2fs_beh;		/* behavior on errors */
+	u_int16_t  e2fs_minrev;		/* minor revision level */
+	u_int32_t  e2fs_lastfsck;	/* time of last fsck */
+	u_int32_t  e2fs_fsckintv;	/* max time between fscks */
+	u_int32_t  e2fs_creator;	/* creator OS */
+	u_int32_t  e2fs_rev;		/* revision level */
+	u_int16_t  e2fs_ruid;		/* default uid for reserved blocks */
+	u_int16_t  e2fs_rgid;		/* default gid for reserved blocks */
+	/* EXT2_DYNAMIC_REV superblocks */
+	u_int32_t  e2fs_first_ino;	/* first non-reserved inode */
+	u_int16_t  e2fs_inode_size;	/* size of inode structure */
+	u_int16_t  e2fs_block_group_nr;	/* block grp number of this sblk*/
+	u_int32_t  e2fs_features_compat; /*  compatible feature set */
+	u_int32_t  e2fs_features_incompat; /* incompatible feature set */
+	u_int32_t  e2fs_features_rocompat; /* RO-compatible feature set */
+	u_int8_t   e2fs_uuid[16];	/* 128-bit uuid for volume */
+	char       e2fs_vname[16];	/* volume name */
+	char       e2fs_fsmnt[64]; 	/* name mounted on */
+	u_int32_t  e2fs_algo;		/* For comcate for dir */
+        u_int8_t   e2fs_prealloc_blk;   /* number of blocks to try to preallocate */
+        u_int8_t   e2fs_prealloc_dblk;  /* number of dirs to preallocate */
+	u_int16_t  e2fs_reserved_ngdb;  /* # of reserved gd blocks for resize */
+        u_int8_t   e2fs_journal_uuid[16]; /* uuid of journal superblock */
+        u_int32_t  e2fs_journal_inum;   /* inode number of journal file */
+        u_int32_t  e2fs_journal_dev;    /* device number of journal file */
+        u_int32_t  e2fs_last_orphan;    /* start of list of inodes to delete */
+        u_int32_t  e2fs_hash_seed[4];   /* HTREE hash seed */
+        u_int8_t   e2fs_def_hash_ver;   /* default hash version to use */
+        u_int8_t   e2fs_char_pad;
+        u_int16_t  e2fs_desc_size;      /* size of group descriptor */
+        u_int32_t  e2fs_def_mnt_opts;
+        u_int32_t  e2fs_first_meta_bg;  /* first metablock block group */
+        u_int32_t  e2fs_mkfs_time;      /* when the fs was created */
+        u_int32_t  e2fs_jnl_blks[17];   /* backup of the journal inode */
+        u_int32_t  e2fs_bcount_hi;      /* block count */
+        u_int32_t  e2fs_rbcount_hi;     /* reserved blocks count */
+        u_int32_t  e2fs_fbcount_hi;     /* free blocks count */
+        u_int16_t  e2fs_min_extra_isize;/* all inodes have at least some bytes */
+        u_int16_t  e2fs_want_extra_isize; /* new inodes should reserve some bytes */
+        u_int32_t  e2fs_flags;          /* miscellaneous flags */
+        u_int16_t  e2fs_raid_stride;    /* RAID stride */
+        u_int16_t  e2fs_mmpintv;        /* number of seconds to wait in MMP checking */
+        u_int64_t  e2fs_mmpblk;         /* block for multi-mount protection */
+        u_int32_t  e2fs_raid_stripe_wid;/* blocks on all data disks (N * stride) */
+        u_int8_t   e2fs_log_gpf;        /* FLEX_BG group size */ 
+        u_int8_t   e2fs_char_pad2;
+        u_int16_t  e2fs_pad;
+        u_int64_t  e2fs_kbytes_written; /* number of lifetime kilobytes written */
+	u_int32_t  reserved2[160];
+};
+
+
+/* Assume that user mode programs are passing in an ext2fs superblock, not
+ * a kernel struct super_block.  This will allow us to call the feature-test
+ * macros from user land. */
+#define EXT2_SB(sb)	(sb)
+
+/*
+ * In-Memory Superblock
+ */
+
+struct m_ext2fs {
+	struct ext2fs * e2fs;
+	char e2fs_fsmnt[MAXMNTLEN];/* name mounted on */
+	char e2fs_ronly;          /* mounted read-only flag */
+	char e2fs_fmod;           /* super block modified flag */
+	uint32_t e2fs_bsize;      /* Block size */
+	uint32_t e2fs_bshift;     /* calc of logical block no */
+	int32_t e2fs_bmask;       /* calc of block offset */
+	int32_t e2fs_bpg;         /* Number of blocks per group */
+	int64_t e2fs_qbmask;       /* = s_blocksize -1 */
+	uint32_t e2fs_fsbtodb;     /* Shift to get disk block */
+	uint32_t e2fs_ipg;        /* Number of inodes per group */
+	uint32_t e2fs_ipb;        /* Number of inodes per block */
+	uint32_t e2fs_itpg;       /* Number of inode table per group */
+	uint32_t e2fs_fsize;      /* Size of fragments per block */
+	uint32_t e2fs_fpb;        /* Number of fragments per block */
+	uint32_t e2fs_fpg;        /* Number of fragments per group */
+	uint32_t e2fs_dbpg;       /* Number of descriptor blocks per group */
+	uint32_t e2fs_descpb;     /* Number of group descriptors per block */
+	uint32_t e2fs_gdbcount;   /* Number of group descriptors */
+	uint32_t e2fs_gcount;     /* Number of groups */
+	uint32_t e2fs_first_inode;/* First inode on fs */
+	int32_t  e2fs_isize;      /* Size of inode */
+	uint32_t e2fs_mount_opt;
+	uint32_t e2fs_blocksize_bits;
+	uint32_t e2fs_total_dir;  /* Total number of directories */
+	uint8_t	*e2fs_contigdirs;
+	char e2fs_wasvalid;       /* valid at mount time */
+	off_t e2fs_maxfilesize;
+	struct ext2_gd *e2fs_gd;  /* Group Descriptors */
+
+	struct mtx e2fs_rsv_lock;                /* Protect reservation window RB tree */
+	struct ext2_rsv_win_tree e2fs_rsv_tree; /* Reservation window index */
+
+        u_int8_t e2fs_log_gpf;    /* FLEX_BG group size */
+        int      e2fs_descpbbits;
+        struct ext4_flex_groups *e2fs_fg;
+
+        u_int16_t e2fs_min_extra_isize;        /* all inodes have at least some bytes */
+        u_int16_t e2fs_want_extra_isize;       /* new inodes should reserve some bytes */
+};
+
+/*
+ * The second extended file system version
+ */
+#define E2FS_DATE		"95/08/09"
+#define E2FS_VERSION		"0.5b"
+
+/*
+ * Revision levels
+ */
+#define E2FS_REV0		0	/* The good old (original) format */
+#define E2FS_REV1		1 	/* V2 format w/ dynamic inode sizes */
+
+#define E2FS_CURRENT_REV	E2FS_REV0
+#define E2FS_MAX_SUPP_REV	E2FS_REV1
+
+#define E2FS_REV0_INODE_SIZE 128
+
+/*
+ * compatible/incompatible features
+ */
+#define EXT2F_COMPAT_PREALLOC		0x0001
+#define EXT2F_COMPAT_RESIZE		0x0010
+#define EXT4F_COMPAT_IMAGIC_INODES      0x0002
+#define EXT4F_COMPAT_HAS_JOURNAL        0x0004
+#define EXT4F_COMPAT_EXT_ATTR           0x0008
+#define EXT4F_COMPAT_DIR_INDEX          0x0020
+
+#define EXT2F_ROCOMPAT_SPARSESUPER	0x0001
+#define EXT2F_ROCOMPAT_LARGEFILE	0x0002
+#define EXT2F_ROCOMPAT_BTREE_DIR	0x0004
+#define EXT4F_ROCOMPAT_HUGE_FILE        0x0008
+#define EXT4F_ROCOMPAT_GDT_CSUM         0x0010
+#define EXT4F_ROCOMPAT_DIR_NLINK        0x0020
+#define EXT4F_ROCOMPAT_EXTRA_ISIZE      0x0040
+
+#define EXT2F_INCOMPAT_COMP		0x0001
+#define EXT2F_INCOMPAT_FTYPE		0x0002
+#define EXT4F_INCOMPAT_RECOVER          0x0004
+#define EXT4F_INCOMPAT_JOURNAL_DEV      0x0008
+#define EXT4F_INCOMPAT_META_BG          0x0010
+#define EXT4F_INCOMPAT_EXTENTS          0x0040
+#define EXT4F_INCOMPAT_64BIT            0x0080
+#define EXT4F_INCOMPAT_MMP              0x0100
+#define EXT4F_INCOMPAT_FLEX_BG          0X0200
+
+/*
+ * Features supported in this implementation
+ *
+ * We support the following REV1 features:
+ * - EXT2F_ROCOMPAT_SPARSESUPER
+ * - EXT2F_ROCOMPAT_LARGEFILE
+ * - EXT2F_INCOMPAT_FTYPE
+ */
+#define EXT2F_COMPAT_SUPP		0x0000
+#define EXT2F_ROCOMPAT_SUPP		(EXT2F_ROCOMPAT_SPARSESUPER \
+					 | EXT2F_ROCOMPAT_LARGEFILE)
+#define EXT2F_INCOMPAT_SUPP		EXT2F_INCOMPAT_FTYPE
+
+/*
+ * Features supported in ext4 read-only mode
+ */
+#define EXT4F_INCOMPAT_SUPP             (EXT2F_INCOMPAT_FTYPE \
+                                         | EXT4F_INCOMPAT_EXTENTS \
+                                         | EXT4F_INCOMPAT_FLEX_BG)
+#define EXT4F_ROCOMPAT_SUPP             (EXT2F_ROCOMPAT_SPARSESUPER \
+                                         | EXT2F_ROCOMPAT_LARGEFILE \
+                                         | EXT2F_ROCOMPAT_BTREE_DIR \
+                                         | EXT4F_ROCOMPAT_GDT_CSUM \
+                                         | EXT4F_ROCOMPAT_DIR_NLINK \
+                                         | EXT4F_ROCOMPAT_EXTRA_ISIZE \
+                                         | EXT4F_ROCOMPAT_HUGE_FILE)
+
+/*
+ * Feature set definitions
+ */
+#define EXT2_HAS_COMPAT_FEATURE(sb,mask)			\
+	( EXT2_SB(sb)->e2fs->e2fs_features_compat & htole32(mask) )
+#define EXT2_HAS_RO_COMPAT_FEATURE(sb,mask)			\
+	( EXT2_SB(sb)->e2fs->e2fs_features_rocompat & htole32(mask) )
+#define EXT2_HAS_INCOMPAT_FEATURE(sb,mask)			\
+	( EXT2_SB(sb)->e2fs->e2fs_features_incompat & htole32(mask) )
+
+/*
+ * Definitions of behavior on errors
+ */
+#define E2FS_BEH_CONTINUE		1	/* continue operation */
+#define E2FS_BEH_READONLY		2	/* remount fs read only */
+#define E2FS_BEH_PANIC			3	/* cause panic */
+#define E2FS_BEH_DEFAULT		E2FS_BEH_CONTINUE
+
+/*
+ * OS identification
+ */
+#define E2FS_OS_LINUX		0
+#define E2FS_OS_HURD		1
+#define E2FS_OS_MASIX		2
+#define E2FS_OS_FREEBSD		3
+#define E2FS_OS_LITES		4
+
+/*
+ * File clean flags
+ */
+#define	E2FS_ISCLEAN			0x0001	/* Unmounted cleanly */
+#define	E2FS_ERRORS			0x0002	/* Errors detected */
+
+/* ext2 file system block group descriptor */
+
+struct ext2_gd {
+	u_int32_t ext2bgd_b_bitmap_lo;	/* blocks bitmap block */
+	u_int32_t ext2bgd_i_bitmap_lo;	/* inodes bitmap block */
+	u_int32_t ext2bgd_i_tables_lo;	/* inodes table block  */
+	u_int16_t ext2bgd_nbfree_lo;	/* number of free blocks */
+	u_int16_t ext2bgd_nifree_lo;	/* number of free inodes */
+	u_int16_t ext2bgd_ndirs_lo;	/* number of directories */
+        u_int16_t ext2bgd_flags;        /* EXT4_BG_flags */
+#if 0
+	u_int32_t reserved[2];
+        u_int16_t ext2bgd_i_tables_unused_lo; /* number of unused inodes */
+        u_int16_t ext2bgd_chksum;       /* crc16 checksum */
+	u_int32_t ext2bgd_b_bitmap_hi;	/* blocks bitmap block MSB */
+	u_int32_t ext2bgd_i_bitmap_hi;	/* inodes bitmap block MSB */
+	u_int32_t ext2bgd_i_tables_hi;	/* inodes table block  MSB */
+	u_int16_t ext2bgd_nbfree_hi;	/* number of free blocks MSB */
+	u_int16_t ext2bgd_nifree_hi;	/* number of free inodes MSB */
+	u_int16_t ext2bgd_ndirs_hi;	/* number of directories MSB */
+        u_int16_t ext2bgd_i_tables_unused_hi; /* number of unused inodes MSB */
+#endif
+        u_int32_t reserved2[3];
+};
+
+/* EXT2FS metadatas are stored in little-endian byte order. These macros
+ * helps reading these metadatas
+ */
+
+#define e2fs_cgload(old, new, size) memcpy((new), (old), (size));
+#define e2fs_cgsave(old, new, size) memcpy((new), (old), (size));
+/*
+ * Macro-instructions used to manage several block sizes
+ */
+#define EXT2_MIN_BLOCK_SIZE		1024
+#define	EXT2_MAX_BLOCK_SIZE		65536
+#define EXT2_MIN_BLOCK_LOG_SIZE		  10
+#if defined(_KERNEL)
+# define EXT2_BLOCK_SIZE(s)		((s)->e2fs_bsize)
+#else
+# define EXT2_BLOCK_SIZE(s)		(EXT2_MIN_BLOCK_SIZE << (s)->e2fs_log_bsize)
+#endif
+#define	EXT2_ADDR_PER_BLOCK(s)		(EXT2_BLOCK_SIZE(s) / sizeof (uint32_t))
+#if defined(_KERNEL)
+# define EXT2_BLOCK_SIZE_BITS(s)	((s)->e2fs_blocksize_bits)
+#else
+# define EXT2_BLOCK_SIZE_BITS(s)	((s)->e2fs_log_bsize + 10)
+#endif
+#if defined(_KERNEL)
+#define	EXT2_ADDR_PER_BLOCK_BITS(s)	(EXT2_SB(s)->s_addr_per_block_bits)
+#define EXT2_INODE_SIZE(s)		(EXT2_SB(s)->e2fs_isize)
+#define EXT2_FIRST_INO(s)		(EXT2_SB(s)->e2fs_first_inode)
+#else
+#define EXT2_INODE_SIZE(s)	(((s)->s_rev_level == E2FS_REV0) ? \
+				 E2FS_REV0 : (s)->s_inode_size)
+#define EXT2_FIRST_INO(s)	(((s)->s_rev_level == E2FS_REV0) ? \
+				 E2FS_REV0 : (s)->e2fs_first_ino)
+#endif
+
+/*
+ * Macro-instructions used to manage fragments
+ */
+#define EXT2_MIN_FRAG_SIZE		1024
+#define	EXT2_MAX_FRAG_SIZE		4096
+#define EXT2_MIN_FRAG_LOG_SIZE		  10
+#if defined(_KERNEL)
+# define EXT2_FRAG_SIZE(s)		(EXT2_SB(s)->e2fs_fsize)
+# define EXT2_FRAGS_PER_BLOCK(s)	(EXT2_SB(s)->e2fs_fpb)
+#else
+# define EXT2_FRAG_SIZE(s)		(EXT2_MIN_FRAG_SIZE << (s)->e2fs_log_fsize)
+# define EXT2_FRAGS_PER_BLOCK(s)	(EXT2_BLOCK_SIZE(s) / EXT2_FRAG_SIZE(s))
+#endif
+
+/*
+ * Macro-instructions used to manage group descriptors
+ */
+#if defined(_KERNEL)
+# define EXT2_BLOCKS_PER_GROUP(s)	(EXT2_SB(s)->e2fs_bpg)
+# define EXT2_DESC_PER_BLOCK(s)		(EXT2_SB(s)->e2fs_descpb)
+# define EXT2_DESC_PER_BLOCK_BITS(s)	(EXT2_SB(s)->s_desc_per_block_bits)
+#else
+# define EXT2_BLOCKS_PER_GROUP(s)	((s)->e2fs_bpg)
+# define EXT2_DESC_PER_BLOCK(s)		(EXT2_BLOCK_SIZE(s) / sizeof (struct ext2_gd))
+
+#endif
+
+#endif	/* _LINUX_EXT4_FS_H */
