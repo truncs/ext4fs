@@ -130,7 +130,7 @@ struct vop_vector ext2_vnodeops = {
 	.vop_pathconf =		ext2_pathconf,
 	.vop_poll =		vop_stdpoll,
 	.vop_print =		ext2_print,
-	.vop_read =		ext2_read,
+	.vop_read =		ext4_read,
 	.vop_readdir =		ext2_readdir,
 	.vop_readlink =		ext2_readlink,
 	.vop_reallocblks =	ext2_reallocblks,
@@ -141,7 +141,7 @@ struct vop_vector ext2_vnodeops = {
 	.vop_setattr =		ext2_setattr,
 	.vop_strategy =		ext2_strategy,
 	.vop_symlink =		ext2_symlink,
-	.vop_write =		ext2_write,
+	.vop_write =		ext4_write,
 	.vop_vptofh =		ext2_vptofh,
 };
 

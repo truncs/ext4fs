@@ -43,9 +43,9 @@
 #define	BLKSIZE(a, b, c)	blksize(a, b, c)
 #define	FS			struct m_ext2fs
 #define	I_FS			i_e2fs
-#define	READ			ext2_read
+#define	READ			ext4_read
 #define	READ_S			"ext2_read"
-#define	WRITE			ext2_write
+#define	WRITE			ext4_write
 #define	WRITE_S			"ext2_write"
 
 static int ext4_ext_read(struct vop_read_args *);
